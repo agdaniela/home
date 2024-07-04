@@ -11,7 +11,7 @@ permalink: pretty
 #favicon: /path/to/favicon.png
 #gh_sponsor: chrisrhymes
 #hide_share_buttons: true
-theme_color: '#333333'
+theme_color: '#9d848e'
 #fixed_navbar: top
 #direction: one of <ltr, rtl, auto>, default: ltr
 force_theme: light
