@@ -1,17 +1,17 @@
 # Site Settings
 lang: en
 title: Daniela´s webpage
-tagline: Bulma Clean Theme
-email: your-email@domain.com
+tagline: Daniela´s webpage
+email: daniela.gonzalez@unc.edu.ar
 description: >
   The demo site for Bulma Clean Theme, made for Jekyll and GitHub pages websites
 baseurl: ""
 url: "agdaniela.github.io"
 permalink: pretty
 #favicon: /path/to/favicon.png
-gh_sponsor: chrisrhymes
+#gh_sponsor: chrisrhymes
 #hide_share_buttons: true
-theme_color: '#6667ab'
+theme_color: '#333333'
 #fixed_navbar: top
 #direction: one of <ltr, rtl, auto>, default: ltr
 force_theme: light
