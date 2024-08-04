@@ -1,17 +1,18 @@
 # Site Settings
 lang: en
-title: Daniela´s webpage
-tagline: Daniela´s webpage
+title: Daniela A. Gonzalez
+tagline: Daniela A. Gonzalez
 email: daniela.gonzalez@unc.edu.ar
 description: >
-  The demo site for Bulma Clean Theme, made for Jekyll and GitHub pages websites
+  Daniela A. Gonzalez personal website
 baseurl: ""
 url: "agdaniela.github.io"
 permalink: pretty
 #favicon: /path/to/favicon.png
 #gh_sponsor: chrisrhymes
 #hide_share_buttons: true
-theme_color: '#9d848e'
+#theme_color: '#9d848e' also change assets/css/app.scss
+theme_color: '#6d6ea4'
 #fixed_navbar: top
 #direction: one of <ltr, rtl, auto>, default: ltr
 force_theme: light
@@ -54,7 +55,7 @@ sass:
     # - node_modules
 
 #google_analytics: UA-code-here
-cookie_policy: /cookie-policy/
+#cookie_policy: /cookie-policy/
 
 defaults:
   -
