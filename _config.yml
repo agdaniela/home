@@ -8,7 +8,7 @@ description: >
 baseurl: ""
 url: "agdaniela.github.io"
 permalink: pretty
-#favicon: /path/to/favicon.png
+favicon: /path/to/favicon.png
 #gh_sponsor: chrisrhymes
 #hide_share_buttons: true
 #theme_color: '#9d848e' also change assets/css/app.scss
@@ -77,7 +77,7 @@ defaults:
 markdown: kramdown
 highlighter: rouge
 
-footer_menu: example_footer_menu
+footer_menu: example_footer_menu #DESCOMENTAR PARA VER LOS FOOTERS, tiene info de los blogs
 
 collections:
   products: 

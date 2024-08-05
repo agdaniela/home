@@ -2,6 +2,10 @@
   link: /docs/
 - name: Teaching
   link: /teaching/  
+- name: Research 
+  link: /research/    
+- name: CV 
+  link: /resume/    
 - name: Example Pages
   link: /#
   dropdown:

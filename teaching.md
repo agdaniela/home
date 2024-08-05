@@ -3,6 +3,7 @@ layout: page
 title: Teaching
 menubar: teaching_menu
 show_sidebar: false
+hide_footer: true
 ---
 
  
