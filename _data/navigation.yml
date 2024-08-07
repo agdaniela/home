@@ -6,6 +6,15 @@
   link: /research/    
 - name: CV 
   link: /resume/    
+  name: Resources
+  link: /#
+  dropdown:
+    name: Classes
+    link: /showcase/
+    name: Visualizations
+    link: /#
+    name: Posters
+    link: /#
 - name: Example Pages
   link: /#
   dropdown:

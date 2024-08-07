@@ -1,9 +1,10 @@
 ---
 layout: page
 title: Research
-menubar: research_menu
+#menubar: example_menu
 show_sidebar: false
- 
+#menubar_toc: true
+#toc_title: Custom Title
 ---
 
 # Phd. Thesis
