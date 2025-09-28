@@ -7,12 +7,12 @@ show_sidebar: true
 
 ---
 
-# Daniela A. Gonzalez 
+ 
 
-Hi, welcome to my website! I am an argentinan economist and a doctoral fellow at the Secretaría de Ciencia y Tecnología from the Universidad Nacional de Córdoba [(SECYT-UNC)](https://www.unc.edu.ar/ciencia-y-tecnolog%C3%ADa) and Assistant Professor at the Facultad de Ciencias Económicas, Universidad Nacional de Córdoba, Córdoba, Argentina [(FCE-UNC)](https://www.eco.unc.edu.ar/). 
+Hi, welcome to my website! I am an argentinan economist and a doctoral fellow at the Secretaría de Ciencia y Tecnología from the Universidad Nacional de Córdoba <a href="https://www.unc.edu.ar/ciencia-y-tecnolog%C3%ADa" target="_blank" class="custom-link" rel="noopener noreferrer">(SECYT-UNC)</a> and Assistant Professor at the Facultad de Ciencias Económicas, Universidad Nacional de Córdoba, Córdoba, Argentina <a href="https://www.eco.unc.edu.ar/" target="_blank" class="custom-link" rel="noopener noreferrer">(FCE-UNC)</a>. 
 
  
-My research interests are in the field of  Statistical and Machine Learning, Quantitative Economic Analysis, Applied Economics and Artificial Intelligence. 
+My research interests are in the field of  Statistical and Machine Learning, Quantitative Economic Analysis, Applied Economics and Artificial Intelligence.  My research uses Bayesian Networks to model and empirically test the competing economic theories on the causes of Argentina's chronic inflation.
 
 <!-- 
 # Bulma Clean Theme demo website

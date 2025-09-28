@@ -1,17 +1,24 @@
 style: is-light
 items:
   - title: Universidad Nacional de Córdoba (UNC)
-    subtitle: National University of Cordoba  
-    icon: building-columns
+    subtitle:  
+    icon: fa-university
     icon_brand: false
   - title: Departamento de Economía y Finanzas, Facultad de Ciencias Económicas (FCE-UNC) 
-    subtitle: Department of Economics and Finance, Faculty of Economic Sciences  
-    icon: school
+    subtitle:  
+    icon: fa-school
     icon_brand: false
-  - title: Secretaría de Ciencia y Tecnología (SECYT-UNC)
-    subtitle: Secretariat of Science and Technology  
-    icon: book-open-reader
-    icon_brand: false
+  - title: LinkedIn
+    subtitle: 
+    call_to_action_name: Let's connect
+    call_to_action_link: https://www.linkedin.com/in/agdaniela/
+    icon: fa-linkedin
+    icon_brand: true
+    call_to_action_newtab: true
+#  - title: Secretaría de Ciencia y Tecnología (SECYT-UNC)
+#    subtitle: Secretariat of Science and Technology  
+#    icon: book-open-reader
+#    icon_brand: false
 
 #  - title: Multiple page layouts
 #    subtitle: Including sidebar, menubar, tabs and callouts

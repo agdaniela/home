@@ -4,17 +4,17 @@
   link: /teaching/  
 - name: Research 
   link: /research/    
-- name: CV 
-  link: /resume/
+#- name: CV 
+#  link: /resume/
 -  name: Resources
    link: /#
    dropdown:
-    - name: Classes
-      link: /#
-    - name: Visualizations
-      link: /#
-    - name: Posters
-      link: /#
+    - name: GitHub Repository
+      link: https://github.com/agdaniela/
+   # - name: Visualizations
+   #   link: /#
+   # - name: Posters
+   #   link: /#
 #- name: Example Pages
 #  link: /#
 #  dropdown:

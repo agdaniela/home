@@ -28,9 +28,10 @@
 
                             {% if callout.call_to_action_name %}
                                 <div class="my-4">
-                                    <a
+                                   <a
                                         href="{{ callout.call_to_action_link | relative_url }}"
                                         class="button is-primary"
+                                        {% if callout.call_to_action_newtab %}target="_blank" rel="noopener noreferrer"{% endif %}
                                     >
                                         {{ callout.call_to_action_name }}
                                     </a>

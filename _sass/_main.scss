@@ -22,3 +22,22 @@ $hero-darken: $dark !default;
 .gh-sponsor {
   color: #ea4aaa;
 }
+
+/* Override Bulma link color site-wide */
+
+.custom-link {
+  color: #6667ab;
+  font-weight: bold;
+}
+
+.callout {
+  padding: 1rem;
+  /* reduce spacing */
+  font-size: 0.7rem;
+  /* shrink text slightly */
+}
+
+.callout .icon {
+  font-size: 2rem;
+  /* smaller icons (default is larger) */
+}

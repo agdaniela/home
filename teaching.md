@@ -10,7 +10,7 @@ hide_footer: true
 
  
 
-# Undergraduate Teaching
+# <i class="fas fa-chalkboard-teacher"></i> Undergraduate Teaching
 
 Faculty member:
 * Statistics I: Probability and Descriptive Statistics. At Facultad de Ciencias Económicas, Universidad Nacional de Córdoba. Since 2022. 
