@@ -1,0 +1,1896 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vinculación de la Estrategia de País con la Cartera — Bolivia</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#e6f2fb;--panel:#d5e8f5;--ink:#1a2238;--muted:#5d6b85;--line:#bcd4e6;
+    --viz-max:1300px; /* ancho máx. del diagrama: bajalo (ej. 1000px) para verlo más chico */
+    --strong:#1f4f8a;      /* azul oscuro: alineación fuerte */
+    --weak:#7fb2e5;        /* azul claro: alineación débil */
+    --none:#c9d2de;        /* gris: sin alineación */
+    --alta:#3fb96b;        /* verde: probabilidad de logro alta */
+    --media:#f2c14e;       /* amarillo: probabilidad media */
+    --baja:#e89b6e;        /* rojo/naranja: probabilidad baja */
+    --sinrev:#c2cad6;      /* gris: sin revisar */
+    --tc:#6cb2e4;          /* celeste: cooperaciones técnicas */
+    --accent:#1f4f8a;
+    --font:"Montserrat",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font);}
+  header{padding:24px 36px 14px;border-bottom:1px solid var(--line);background:#d5e8f5;}
+  h1{font-size:23px;margin:0 0 5px;font-weight:600;color:var(--ink);}
+  .sub{font-size:12.5px;color:var(--muted);line-height:1.5;max-width:1180px;font-weight:400;}
+  .loadbar{margin:14px 36px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .loadbtn{background:var(--accent);color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);transition:background .15s;}
+  .loadbtn:hover{background:#163a66;}
+  .resumen-actions{margin:16px 36px 0;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .loadbtn.secundario{background:#fff;color:var(--accent);border:1.5px solid var(--accent);}
+  .loadbtn.secundario:hover{background:#eaf3fb;}
+  table.resumen-table .er-cell{max-width:340px;}
+  table.resumen-table .op-codes{font-size:10.5px;color:var(--muted);}
+  .pilar-row td{background:#1f4f8a !important;color:#fff !important;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;}
+  table.align-table tr.pilar-row td, table.resumen-table tr.pilar-row td{color:#fff !important;background:#1f4f8a !important;}
+  #loadstatus{font-size:12px;color:var(--muted);font-style:italic;}
+  .stats{display:flex;gap:28px;flex-wrap:wrap;margin:14px 36px 4px;}
+  .stat .n{font-size:26px;font-weight:700;color:var(--ink);}
+  .stat .l{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:500;}
+  .stat .l sup.ast{color:var(--muted);font-weight:700;font-size:11px;}
+  .stats-foot{margin:2px 36px 8px;font-size:10.5px;color:var(--accent);font-style:italic;max-width:1180px;line-height:1.5;}
+  .legend{display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin:10px 36px 4px;font-size:12px;color:var(--muted);font-weight:400;}
+  .legend .grp{display:flex;gap:8px;align-items:center;}
+  .legend .sw{width:26px;height:0;border-top-width:3px;border-top-style:solid;}
+  .legend .dot{width:12px;height:12px;border-radius:50%;}
+  .legend .bar{width:80px;height:11px;border-radius:3px;display:inline-block;background:linear-gradient(90deg,#e0524d 0%,#ef8a4d 25%,#f2c14e 50%,#b6c84a 75%,#3fb96b 100%);}
+  svg{display:block;width:100%;max-width:var(--viz-max);background:transparent;font-family:var(--font);}
+  .node-label{font-size:11px;fill:var(--ink);cursor:default;font-weight:500;}
+  .oe-circle-label{font-size:9px;fill:#fff;font-weight:700;pointer-events:none;}
+  .node-rect{cursor:pointer;}
+  .link{fill:none;transition:opacity .18s;}
+  .dim{opacity:.06 !important;}
+  .objlink{opacity:0 !important;}            /* líneas op→objetivo ocultas en reposo */
+  .objlink.show{opacity:.85 !important;}     /* visibles al hover de su operación/objetivo */
+  .node-dim{opacity:.18 !important;transition:opacity .18s;}
+  .node-hi{stroke:#f0a030 !important;stroke-width:2.5 !important;}
+  .obj-badge{cursor:default;}
+  .obj-badge circle{fill:#1f4f8a;}
+  .obj-badge text{fill:#fff;font-size:10px;font-weight:700;}
+  .pilar-label{font-size:10.5px;font-weight:700;letter-spacing:.2px;}
+  .colhead{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.1px;fill:var(--accent);}
+  .tip{position:fixed;pointer-events:none;background:#1a2238;border:1px solid var(--line);border-radius:8px;padding:11px 14px;font-size:12px;color:#fff;max-width:440px;opacity:0;transition:opacity .12s;box-shadow:0 8px 26px rgba(0,0,0,.25);z-index:9;font-weight:400;line-height:1.45;}
+  footer{padding:14px 36px 30px;font-size:10.5px;color:var(--muted);border-top:1px solid var(--line);font-weight:400;}
+  .tabs{display:flex;gap:4px;margin:14px 36px 0;border-bottom:2px solid var(--line);}
+  .tab{padding:9px 20px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;border:2px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;background:transparent;transition:all .15s;font-family:var(--font);}
+  .tab:hover{color:var(--ink);background:rgba(31,79,138,.05);}
+  .tab.active{color:var(--accent);background:#fff;border-color:var(--line);border-bottom:2px solid #fff;margin-bottom:-2px;}
+  .tab-content{display:none;}
+  .tab-content.active{display:block;}
+  .tab-intro{margin:12px 36px 0;font-size:12px;color:var(--muted);font-style:italic;}
+  .align-table-wrap{margin:14px 36px 30px;overflow-x:auto;}
+  table.align-table{border-collapse:collapse;width:100%;font-size:11.5px;background:#fff;}
+  table.align-table th{background:var(--accent);color:#fff;font-weight:600;text-align:left;padding:8px 10px;border:1px solid #15375f;position:sticky;top:0;}
+  table.align-table td{padding:7px 10px;border:1px solid var(--line);vertical-align:top;line-height:1.4;color:var(--ink);}
+  table.align-table tr:nth-child(even) td{background:#f7fafd;}
+  .badge{display:inline-block;padding:3px 9px;border-radius:10px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+  .badge.strong{background:#1f4f8a;color:#fff;}
+  .badge.weak{background:#d3e6f8;color:#1f4f8a;}
+  .badge.none{background:#f2f2f2;color:#888;}
+  .col-op{font-weight:700;white-space:nowrap;}
+  .col-num{text-align:center;font-weight:600;}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="page-title">Vinculación de la Estrategia de País con la Cartera — Bolivia</h1>
+  <div class="sub" data-i18n="sub">Cada operación se despliega en sus <strong>Resultados Esperados de la operación (RE)</strong>, que se vinculan con los <strong>Resultados Esperados de la estrategia (ER)</strong>, agrupados por Objetivo Estratégico y Pilar. Las líneas indican el grado de alineación.</div>
+</header>
+
+<div style="margin:8px 36px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+  <label class="loadbtn" for="csvfile">📄 Cargar / reemplazar CSV del agente</label>
+  <input type="file" id="csvfile" accept=".csv,text/csv" style="display:none">
+  <label class="loadbtn secundario" for="colorfile">🎨 Cargar / reemplazar colores</label>
+  <input type="file" id="colorfile" accept=".csv,text/csv" style="display:none">
+  <span id="loadstatus">Datos precargados. Podés reemplazar el CSV del agente o los colores.</span>
+  <span id="colorstatus" style="font-size:12px;color:var(--muted);font-style:italic;"></span>
+  <button type="button" id="toggleObj" class="loadbtn secundario" onclick="toggleObjLinks()" title="Alterna si se muestran las alineaciones a nivel de Objetivo Estratégico">🔗 Alineaciones a objetivo: ON</button>
+</div>
+
+<div class="stats" id="stats"></div>
+<div class="stats-foot" id="stats-foot"></div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="A" onclick="switchTab('A')">Operaciones*</button>
+  <button class="tab" data-tab="B" onclick="switchTab('B')">Cooperaciones Técnicas </button>
+  <button class="tab" data-tab="resumen" onclick="switchTab('resumen')">Resumen por ER</button>
+  <button class="tab" data-tab="agregada" onclick="switchTab('agregada')">Alineación agregada</button>
+  <button class="tab" data-tab="tabla" onclick="switchTab('tabla')">Tabla completa</button>
+  <button class="tab" data-tab="resumenejec" onclick="switchTab('resumenejec')">Resumen ejecutivo</button>
+</div>
+
+<div class="legend" id="legend">
+  <div class="grp" data-i18n="leg1"><span style="font-weight:700;color:var(--ink)">Probabilidad de logro (operaciones):</span></div>
+  <div class="grp" data-i18n="leg2"><span class="dot" style="background:var(--alta)"></span> Alta</div>
+  <div class="grp" data-i18n="leg3"><span class="dot" style="background:var(--media)"></span> Media</div>
+  <div class="grp" data-i18n="leg4"><span class="dot" style="background:var(--baja)"></span> Baja</div>
+  <div class="grp" data-i18n="leg5"><span class="dot" style="background:var(--sinrev)"></span> Sin revisar</div>
+  <div class="grp" data-i18n="leg6" style="margin-left:10px"><span style="font-weight:700;color:var(--ink)">RE de estrategia / objetivo:</span> <span class="bar"></span> promedio (continuo)</div>
+  <div class="grp" data-i18n="leg7" style="margin-left:10px"><span class="dot" style="background:var(--tc)"></span> Cooperación Técnica</div>
+  <div class="grp" data-i18n="leg8" style="margin-left:10px"><span style="font-weight:700;color:var(--ink)">Trazo:</span> <span class="sw" style="border-top-color:#8a97ad"></span> fuerte · <span class="sw" style="border-top-color:#8a97ad;border-top-style:dashed"></span> débil</div>
+</div>
+<div id="legend-note" data-i18n="legnote" style="margin:2px 36px 6px;font-size:11px;color:var(--muted);font-style:italic;max-width:1180px;line-height:1.5;">Probabilidad de logro por operación (revisión de cartera), escala 0–1: Baja=0, Media=0.5, Alta=1. El color de cada operación surge de la regla de agregación sobre sus Resultados Esperados (RE); el de los Resultados Esperados de la estrategia y los objetivos es el promedio simple (0–1) de las operaciones tipo A alineadas con probabilidad revisada — umbrales: ≤0.25 baja · 0.25–0.70 media · ≥0.70 alta. Las Cooperaciones Técnicas no llevan color de probabilidad (celeste).</div>
+
+<div class="tab-content active" id="tab-A">
+  <div class="tab-intro" data-i18n="intro_A"><sup class="ast">*</sup>Operaciones activas desde la aprobación de la EBP (aprobadas bajo la EBP y heredadas) de acuerdo con los criterios de OVE (préstamos, garantías, grants). Pase el cursor sobre los círculos (RE) para ver el objetivo específico, y sobre las líneas para ver la justificación. <strong>Hacé clic para fijar lo resaltado</strong> (útil para scrollear sin perderlo); clic de nuevo o en un espacio vacío para soltar. </div>
+  <svg id="chart-A"></svg>
+</div>
+<div class="tab-content" id="tab-B">
+  <div class="tab-intro" data-i18n="intro_B">Cooperaciones Técnicas. Su alineación, cuando existe, es de alcance acotado.</div>
+  <svg id="chart-B"></svg>
+</div>
+<div class="tab-content" id="tab-resumen">
+  <div class="resumen-actions">
+    <button class="loadbtn" onclick="descargarResumenCSV()">⬇ Descargar tabla (CSV para Excel)</button>
+    <button class="loadbtn secundario" onclick="copiarResumen()">📋 Copiar tabla</button>
+    <span id="copystatus" style="font-size:12px;color:var(--muted);font-style:italic;"></span>
+  </div>
+  <div class="align-table-wrap" id="resumen-table-wrap"></div>
+  <h2 style="margin:26px 36px 0;font-size:14.5px;font-weight:600;color:var(--ink);">Operaciones sin alineación con la estrategia</h2>
+  <div class="tab-intro" data-i18n="intro_noalin">Operaciones cuya clasificación no arrojó ninguna vinculación con un Resultado Esperado de la estrategia (todas sus filas con conexión lógica = NO).</div>
+  <div class="align-table-wrap" id="noalin-table-wrap"></div>
+</div>
+<div class="tab-content" id="tab-agregada">
+  <div class="resumen-actions">
+    <button class="loadbtn" onclick="descargarAgregadaCSV()">⬇ Descargar (CSV para Excel)</button>
+    <button class="loadbtn secundario" onclick="copiarTabla('#agregada-table-wrap table','copystatus2')">📋 Copiar tabla</button>
+    <span id="copystatus2" style="font-size:12px;color:var(--muted);font-style:italic;"></span>
+  </div>
+  <div class="tab-intro" data-i18n="intro_agregada">Calificación de cada Resultado Esperado según sus operaciones alineadas: <strong>Fuerte</strong> si las operaciones de alineación fuerte son mayoría o hay empate (una fuerte y una débil cuenta como Fuerte); <strong>Débil</strong> si predominan las de alineación débil; <strong>Sin cobertura</strong> si no hay operaciones alineadas. El objetivo de la estrategia se considera <strong>fuerte cuando al menos uno de sus Resultados Esperados es fuerte</strong> (se refleja en las líneas hacia el objetivo). Las Cooperaciones Técnicas no se consideran en esta calificación.</div>
+  <div class="align-table-wrap" id="agregada-table-wrap"></div>
+</div>
+<div class="tab-content" id="tab-tabla">
+  <div class="resumen-actions">
+    <button class="loadbtn secundario" onclick="copiarTabla('#align-table-wrap table','copystatus3')">📋 Copiar tabla</button>
+    <span id="copystatus3" style="font-size:12px;color:var(--muted);font-style:italic;"></span>
+  </div>
+  <div class="align-table-wrap" id="align-table-wrap"></div>
+</div>
+
+<div class="tip" id="tip"></div>
+<footer data-i18n="footer">Fuente: ejercicio de clasificación de alineación de la cartera con los Resultados Esperados de la estrategia de país. RE = Resultado Esperado de la operación (objetivo específico). ER = Resultado Esperado de la estrategia.</footer>
+
+<!-- Inyección desde el flujo (Power Automate reemplaza estos marcadores). Si no se reemplazan, se usan los datos embebidos. -->
+<script type="text/plain" id="estrategia-src">Fomentar la sostenibilidad fiscal y la capacidad institucional|Promover la sostenibilidad fiscal|Mayor eficiencia del sector público
+Fomentar la sostenibilidad fiscal y la capacidad institucional|Promover la sostenibilidad fiscal|Contribuir consolidación fiscal
+Fomentar la sostenibilidad fiscal y la capacidad institucional|Fortalecer y modernizar la gestión del sector público.|Mejorar la simplificación administrativa y la digitalización.
+Habilitar condiciones para promover la inversión del sector privado|Mayor integración comercial|Marco normativo y regulatorio fortalecido para facilitar el comercio exterior.
+Habilitar condiciones para promover la inversión del sector privado|Mayor integración comercial|Un marco normativo y regulatorio fortalecido para la inversión privada.
+Habilitar condiciones para promover la inversión del sector privado|Mejora de la infraestructura productiva y la tecnología|Mayor acceso a la financiación para el sector privado.
+Habilitar condiciones para promover la inversión del sector privado|Mejora de la infraestructura productiva y la tecnología|Incrementar la inversión productiva.
+Fortalecimiento del bienestar social|Mejor focalización de las políticas sociales|Crear y fortalecer sistema de protección social
+Fortalecimiento del bienestar social|Mejorar la prestación de servicios básicos.|Mejora de la calidad y el acceso a servicios de agua y saneamiento
+Fortalecimiento del bienestar social|Mejorar la prestación de servicios básicos.|Mejora de la calidad y el acceso a la electricidad en zonas rurales
+Fortalecimiento del bienestar social|Mejorar la prestación de servicios básicos.|Mejora de la calidad y el acceso a los servicios de salud
+Fortalecimiento del bienestar social|Mejorar la prestación de servicios básicos.|Acceso a la infraestructura urbana.</script>
+<script type="text/plain" id="datos-src">nivel, project, oe_id, oe_text, er_slot, logical_connection, related_er, feasibility, alignment, reasoning
+OE,BO-G1006,OE1,Acceso a electricidad rural,ER1,YES,Mejora de la calidad y el acceso a la electricidad en zonas rurales,High,Strong,"Bajo el objetivo de mejorar la prestación de servicios básicos (SO 6), el OE busca acceso a electricidad en zonas rurales y las intervenciones previstas (extensión de redes y minirredes) hacen factible mejorar el acceso en esas áreas."
+OP,BO-G1006,,,,YES,Mejora de la calidad y el acceso a la electricidad en zonas rurales,High,Strong,La operación conecta fuertemente con este resultado del objetivo de servicios básicos al enfocarse en ampliar el acceso a la electricidad en zonas rurales.
+OE,BO-G1012,OE1,Servicio electrico confiable y costo-efectivo en el NAB,ER1,YES,Mejora de la calidad y el acceso a la electricidad en zonas rurales,High,Strong,"Under the basic-services objective (SO 6), the words 'provision de un servicio electrico confiable y costo-efectivo para los hogares y sectores productivos' evidence improved quality and access to electricity in a rural region (NAB), and division INE/ENE confirms the sector."
+OP,BO-G1012,,,,YES,Mejora de la calidad y el acceso a la electricidad en zonas rurales,High,Strong,"Under the basic-services objective, the general objective targets reliable, cost-effective electricity for households and productive sectors in the NAB, which maps to improved quality and access to rural electricity."
+OE,BO-L1080,OE1,Aumentar disponibilidad de agua para abastecimiento,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,"Bajo el objetivo de servicios básicos (SO 6), el OE de aumentar la disponibilidad de agua para sistemas de abastecimiento en El Alto y Batallas apunta directamente a mejorar el acceso y la calidad de agua potable que mide este resultado."
+OE,BO-L1080,OE2,Mejorar y ampliar utilización de sistemas de riego,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Bajo el objetivo de servicios básicos (SO 6), el OE sobre riego actúa en el sector hídrico pero no evidencia el RE 6.1, que se refiere a agua potable y saneamiento, pues se enfoca en riego para producción agrícola."
+OE,BO-L1080,OE3,Gestión integrada de recursos hídricos y uso sostenible,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Bajo el objetivo de servicios básicos (SO 6), el OE de gestión integrada de recursos hídricos actúa sobre la gobernanza del agua pero no evidencia el RE 6.1, que exige mejoras directas en acceso/calidad de agua y saneamiento."
+OP,BO-L1080,,,,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,Al menos un objetivo específico se alinea de forma fuerte con este resultado.
+OE,BO-L1087,OE1,Acceso a agua y alcantarillado en areas periurbanas,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,"Under the objective Mejorar la prestación de servicios básicos, OE1 explicitly increases access and improves quality of agua y saneamiento, directly evidencing this result."
+OE,BO-L1087,OE2,Fortalecimiento de prestadores de servicios de agua,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"The strengthened entities (EPSA y SEMAPAR, utilities in the water sector) act upon service provision under this objective; the nearest result is Mejora de la calidad y el acceso a servicios de agua y saneamiento, which this OE does not by itself evidence since it targets management and financial performance."
+OP,BO-L1087,,,,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,At least one specific objective aligns strongly with improving access and quality of water and sanitation services.
+OE,BO-L1102,OE1,Accesibilidad de vias pavimentadas,,NO,None,None,None,"No resultado de la estrategia se refiere al transporte vial, por lo que esta OE no evidencia ninguno de los RE listados."
+OE,BO-L1102,OE2,Reduccion de tiempos de viaje,,NO,None,None,None,"No resultado de la estrategia aborda tiempos de viaje o transporte, por lo que esta OE no evidencia ninguno de los RE listados."
+OE,BO-L1102,OE3,Reduccion de costos de operacion vehicular,,NO,None,None,None,"No resultado de la estrategia cubre costos de transporte o carreteras, por lo que esta OE no evidencia ninguno de los RE listados."
+OE,BO-L1102,OE4,Gestion y preservacion del patrimonio vial,,NO,None,None,None,La mejora de la gestion de activos viales no corresponde a ningun RE especifico dado que no hay objetivo sectorial de transporte en la estrategia.
+OE,BO-L1102,OE5,Recaudo y atencion en peajes,ER1,YES,Mayor eficiencia del sector público,Low,Weak,"Bajo el objetivo de Promover la sostenibilidad fiscal, mejorar el recaudo y la atencion en estaciones de peaje contribuye a la eficiencia del sector publico."
+OE,BO-L1102,OE6,Eficiencia del sistema,,NO,None,None,None,El enunciado es generico y no coincide con ningun RE especifico de los objetivos disponibles.
+OE,BO-L1102,OE7,Base de datos de accidentes digitalizada,ER1,YES,Mejorar la simplificación administrativa y la digitalización.,Low,Weak,"Bajo el objetivo de Fortalecer y modernizar la gestion del sector publico, la creacion y digitalizacion de una base de datos de accidentes evidencia avances en digitalizacion administrativa."
+OE,BO-L1102,OE8,Capacidades sectoriales de la ABC,,NO,None,None,None,El fortalecimiento generico de capacidades de la ABC no nombra sistemas ni procesos medidos por los RE y no hay objetivo de transporte en la estrategia.
+OP,BO-L1102,,,,YES,Mayor eficiencia del sector público,Low,Weak,Una OE contribuye debilmente a la eficiencia del sector publico bajo el objetivo de sostenibilidad fiscal.
+OP,BO-L1102,,,,YES,Mejorar la simplificación administrativa y la digitalización.,Low,Weak,Una OE evidencia avances en digitalizacion administrativa bajo el objetivo de modernizacion del sector publico.
+OE,BO-L1118,OE1,Mejora de calidad del agua del Río Katari,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Under the basic services objective; the nearest result is 'Mejora de la calidad y el acceso a servicios de agua y saneamiento', but this OE focuses on ambient water quality rather than the quality or access of the sanitation service itself."
+OE,BO-L1118,OE2,Mejora de calidad del agua del Lago Menor,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Under the basic services objective; the nearest result is 'Mejora de la calidad y el acceso a servicios de agua y saneamiento', but the OE measures environmental water quality rather than service quality or access."
+OE,BO-L1118,OE3,Capacidad de tratamiento en El Alto implementada,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,Under the basic services objective; implementing wastewater treatment capacity directly improves the quality and coverage of sanitation services.
+OE,BO-L1118,OE4,Calidad del efluente de PTAR mejorada,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,Under the basic services objective; improving the quality of treated wastewater reflects better sanitation service quality.
+OE,BO-L1118,OE5,Mayor participación de mujeres en entidades de AyS,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Under the basic services objective; the nearest result is 'Mejora de la calidad y el acceso a servicios de agua y saneamiento', but increasing women's participation does not by itself evidence improved service quality or access."
+OE,BO-L1118,OE6,Tratamiento de aguas residuales en localidades mejorado,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,Under the basic services objective; improving wastewater treatment in localities strengthens sanitation service quality.
+OE,BO-L1118,OE7,Acceso a alcantarillado sanitario ampliado,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,Under the basic services objective; expanding sewerage access directly contributes to improved access to sanitation services.
+OE,BO-L1118,OE8,Prestadores de servicios fortalecidos,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,Low,Weak,Under the basic services objective; strengthening service providers supports but does not by itself ensure improvements in service quality or access.
+OE,BO-L1118,OE9,Acceso a recolección y disposición de RSU en Copacabana y Tihuanacu,ER1,YES,Acceso a la infraestructura urbana.,High,Strong,Under the basic services objective; implementing access to solid waste collection and disposal facilities advances access to urban infrastructure.
+OE,BO-L1118,OE10,Acceso a recolección y disposición de RSU en la Cuenca Katari,ER1,YES,Acceso a la infraestructura urbana.,High,Strong,Under the basic services objective; enabling access to solid waste collection and sanitary disposal constitutes provision of urban infrastructure.
+OE,BO-L1118,OE11,Áreas de la cuenca disponibles para uso urbano,ER1,YES,Acceso a la infraestructura urbana.,Low,Weak,Under the basic services objective; making areas available for urban use facilitates but does not by itself deliver access to urban infrastructure.
+OE,BO-L1118,OE12,Gestión integral de la Cuenca Katari mejorada,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Under the basic services objective; the nearest result is 'Mejora de la calidad y el acceso a servicios de agua y saneamiento', but improving integrated basin management is broader and does not directly evidence service quality or access."
+OP,BO-L1118,,,,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,"Multiple specific objectives expand access to and improve the quality of sanitation services, including wastewater treatment capacity, effluent quality, treatment in localities, and sewerage access."
+OP,BO-L1118,,,,YES,Acceso a la infraestructura urbana.,High,Strong,"Specific objectives implement access to solid waste collection and disposal and facilitate urban-use areas, advancing access to urban infrastructure."
+OE,BO-L1182,OE1,Aumento de gasto turistico por visitante internacional,SO1,YES,Mayor integración comercial,Low,Weak,"Under the trade integration objective, the nearest result is a strengthened regulatory framework to facilitate trade, which this OE does not evidence as it targets tourism demand metrics rather than regulatory reforms."
+OE,BO-L1182,OE2,Incremento de empleos por turismo,SO1,YES,Mayor integración comercial,Low,Weak,"Under the trade integration objective, the nearest result is a strengthened regulatory framework to facilitate trade, which this OE does not evidence as it targets employment generation in tourism rather than regulatory reforms."
+OE,BO-L1182,OE3,Aumento de estadia por PCyMT,SO1,YES,Mayor integración comercial,Low,Weak,"Under the trade integration objective, the nearest result is a strengthened regulatory framework to facilitate trade, which this OE does not evidence as it targets length of stay of international visitors rather than regulatory reforms."
+OE,BO-L1182,OE4,Aumento de estadia por centros historicos,SO1,YES,Mayor integración comercial,Low,Weak,"Under the trade integration objective, the nearest result is a strengthened regulatory framework to facilitate trade, which this OE does not evidence as it targets visitor length of stay via tourism offerings rather than regulatory reforms."
+OE,BO-L1182,OE5,Mayor visibilidad online internacional,SO1,YES,Mayor integración comercial,Low,Weak,"Under the trade integration objective, the nearest result is a strengthened regulatory framework to facilitate trade, which this OE does not evidence as it targets online visibility and marketing rather than regulatory reforms."
+OP,BO-L1182,,,,YES,Mayor integración comercial,Low,Weak,All specific objectives act upon trade integration via tourism outcomes but none evidences a regulatory-framework result under this objective.
+OE,BO-L1184,OE1,Acceso a agua en ciudades <2k,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,"Bajo el objetivo SO 6 de mejorar la prestación de servicios básicos, el OE incrementa/mejora el acceso a agua potable en ciudades menores, incidiendo directamente en el RE 6.1."
+OE,BO-L1184,OE2,Acceso a saneamiento <2k,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,"En el marco del objetivo SO 6 de mejorar la prestación de servicios básicos, el OE incrementa/mejora el acceso a saneamiento en ciudades menores, lo cual se alinea directamente con el RE 6.1."
+OE,BO-L1184,OE3,Acceso a agua 2k-20k,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,"Dentro del objetivo SO 6 de mejorar la prestación de servicios básicos, el OE aumenta/mejora el acceso a agua potable en ciudades intermedias, evidenciando el RE 6.1."
+OE,BO-L1184,OE4,Acceso a saneamiento 2k-20k,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,"Bajo el objetivo SO 6 de mejorar la prestación de servicios básicos, el OE incrementa/mejora el acceso a saneamiento en ciudades intermedias, conectando directamente con el RE 6.1."
+OE,BO-L1184,OE5,Fortalecimiento de prestadores <2k,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"En el objetivo SO 6, el OE fortalece prestadores de AyS; el RE más cercano es 'Mejora de la calidad y el acceso a servicios de agua y saneamiento', pero el texto no compromete mejoras directas de acceso o calidad."
+OE,BO-L1184,OE6,Fortalecimiento de prestadores 2k-20k,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"En el objetivo SO 6, el OE fortalece prestadores de AyS; el RE más próximo es 'Mejora de la calidad y el acceso a servicios de agua y saneamiento', pero el OE no declara mejoras directas de acceso o calidad."
+OE,BO-L1184,OE7,Participación de mujeres en entidades AyS 2k-20k,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Dentro del objetivo SO 6, el OE aborda la participación de mujeres en entidades de AyS; el RE más cercano es 'Mejora de la calidad y el acceso a servicios de agua y saneamiento', pero el OE se centra en gobernanza/paridad y no en acceso o calidad."
+OP,BO-L1184,,,,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,"Varios OEs incrementan/mejoran el acceso a agua y saneamiento, alineándose directamente con el RE 6.1 del objetivo de servicios básicos."
+OE,BO-L1190,OE1,Interconexion al SIN para reducir diesel en San Ignacio,ER1,YES,Mejora de la calidad y el acceso a la electricidad en zonas rurales,High,Strong,"Bajo el objetivo de servicios básicos, la interconexión del SA al SIN en San Ignacio de Velasco mejora la calidad y el acceso a la electricidad en un área aislada al sustituir generación con diésel."
+OE,BO-L1190,OE2,EE en alumbrado publico en Oruro y Potosi,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Actúa sobre la prestación de servicios básicos (electricidad); el RE más cercano es 'Mejora de la calidad y el acceso a la electricidad en zonas rurales', pero la OE se centra en eficiencia de alumbrado público urbano y no en acceso rural, por lo que no evidencia ese RE."
+OP,BO-L1190,,,,YES,Mejora de la calidad y el acceso a la electricidad en zonas rurales,High,Strong,La conexión de un sistema aislado al SIN evidencia el resultado de mejorar la calidad y el acceso a la electricidad en zonas rurales.
+OE,BO-L1191,OE1,Acceso y resiliencia en agua potable urbana,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,"Bajo el objetivo 'Mejorar la prestación de servicios básicos', el OE busca explícitamente 'incrementar y mejorar el acceso a servicios de agua potable' en ciudades, lo que corresponde directamente a mejorar la calidad y el acceso a agua y saneamiento."
+OE,BO-L1191,OE2,Eficiencia de prestadores de agua potable,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,"Bajo el objetivo 'Mejorar la prestación de servicios básicos', el fortalecimiento de prestadores y la gestión de oferta y demanda para aumentar la disponibilidad de agua potable respaldan directamente la mejora de la calidad y el acceso a agua y saneamiento."
+OE,BO-L1191,OE3,Capacidades de preinversión en proyectos de AP,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Actúa sobre los servicios de agua bajo el objetivo 'Mejorar la prestación de servicios básicos'; el RE más cercano es 'Mejora de la calidad y el acceso a servicios de agua y saneamiento', pero la preinversión por sí sola no evidencia una mejora medible."
+OP,BO-L1191,,,,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,Al menos un OE se alinea fuertemente con la mejora de la calidad y el acceso a agua y saneamiento bajo el objetivo de prestación de servicios básicos.
+OE,BO-L1192,OE1,"Acceso a agua potable y saneamiento, con recoleccion y tratamiento de aguas residuales",ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,"Bajo el objetivo de mejorar la prestación de servicios básicos, el OE incrementa y mejora el acceso a agua y saneamiento incluyendo recolección y tratamiento de aguas residuales, que es precisamente lo que mide el resultado."
+OE,BO-L1192,OE2,Planificacion y gestion integral de los servicios de AS,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,Low,Weak,"Bajo el objetivo de mejorar la prestación de servicios básicos, el OE apoya la planificación y gestión integral de los servicios de AS, lo que puede contribuir indirectamente a mejorar calidad y acceso sin garantizarlo por sí mismo."
+OE,BO-L1192,OE3,Acciones estrategicas para la seguridad hidrica urbana,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,Low,Weak,"Bajo el objetivo de mejorar la prestación de servicios básicos, el OE impulsa acciones estratégicas de seguridad hídrica que pueden apoyar mejoras en acceso y calidad de AS, aunque no las aseguran de forma directa."
+OP,BO-L1192,,,,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,High,Strong,"Varios objetivos específicos, incluyendo uno de expansión directa del acceso, se alinean con la mejora de la calidad y el acceso a servicios de agua y saneamiento."
+OE,BO-L1198,OE1,Calidad y acceso en cuidados obstetricos y neonatales incrementados,ER1,YES,Mejora de la calidad y el acceso a los servicios de salud,High,Strong,"Bajo el objetivo de 'Mejorar la prestación de servicios básicos', el OE incrementa la calidad y accesibilidad de cuidados obstétricos, neonatales y PF en la red de salud, evidenciando la 'Mejora de la calidad y el acceso a los servicios de salud'."
+OE,BO-L1198,OE1,Calidad y acceso en cuidados obstetricos y neonatales incrementados,ER2,YES,Mejorar la simplificación administrativa y la digitalización.,Low,Weak,"Bajo el objetivo de 'Fortalecer y modernizar la gestión del sector público', el OE apoya la transformación digital de la red pública de salud mediante la mejora de sus sistemas de información, contribuyendo a la 'simplificación administrativa y la digitalización' de forma instrumental."
+OP,BO-L1198,,,,YES,Mejora de la calidad y el acceso a los servicios de salud,High,Strong,Un objetivo específico alinea fuertemente con este resultado del objetivo de servicios básicos (salud).
+OP,BO-L1198,,,,YES,Mejorar la simplificación administrativa y la digitalización.,Low,Weak,El objetivo específico contribuye débilmente a este resultado del objetivo de gestión pública al digitalizar sistemas de información en salud.
+OE,BO-L1209,OE1,Infraestructura aeroportuaria segura y con capacidad operativa,SO1,YES,Mayor integración comercial,Low,Weak,"Under the commercial integration objective; the closest result is the strengthened regulatory framework for trade facilitation, but the OE upgrades airport infrastructure and service levels, acting via connectivity rather than regulations."
+OP,BO-L1209,,,,YES,Mayor integración comercial,Low,Weak,"The operation connects at the objective level to commercial integration, with no specific result evidenced by the airport infrastructure OE."
+OE,BO-L1212,OE1,Sistema de nuevos espacios públicos de calidad,ER1,YES,Acceso a la infraestructura urbana.,High,Strong,"Bajo el objetivo 'Mejorar la prestación de servicios básicos', las palabras del objetivo general 'creación de un sistema de nuevos espacios públicos de calidad' evidencian aumento del acceso a infraestructura urbana, consistente con la división CSD/HUD."
+OP,BO-L1212,,,,YES,Acceso a la infraestructura urbana.,High,Strong,"El objetivo general menciona 'creación de un sistema de nuevos espacios públicos de calidad', lo que incrementa el acceso a infraestructura urbana bajo el objetivo de prestación de servicios básicos."
+OE,BO-L1219,OE1,Apoyo a ingresos mínimos vía transferencias,ER1,YES,Crear y fortalecer sistema de protección social,Low,Weak,"Under the social protection objective, emergency transfers to affected people support income protection aligning with creating and strengthening a social protection system, though this alone does not establish the system."
+OE,BO-L1219,OE2,Conducción nacional de la respuesta sanitaria,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"This acts upon health services under the basic services objective, but the closest result is 'Mejora de la calidad y el acceso a los servicios de salud', which leadership and coordination alone do not evidence."
+OE,BO-L1219,OE3,Detección y seguimiento de casos,ER1,YES,Mejora de la calidad y el acceso a los servicios de salud,High,Strong,"Under the basic services (health) objective, improving case detection and tracking directly contributes to the quality of health services measured by this result."
+OE,BO-L1219,OE4,Interrupción de transmisión mediante vacunación,ER1,YES,Mejora de la calidad y el acceso a los servicios de salud,High,Strong,"Under the basic services (health) objective, vaccination to interrupt transmission directly improves the quality of health services as captured by this result."
+OE,BO-L1219,OE5,Capacidad de provisión de servicios de salud,ER1,YES,Mejora de la calidad y el acceso a los servicios de salud,High,Strong,"Under the basic services (health) objective, improving the capacity to provide services directly targets the quality and access of health services measured by this result."
+OP,BO-L1219,,,,YES,Crear y fortalecer sistema de protección social,Low,Weak,One specific objective connects weakly by providing emergency income transfers that align with creating and strengthening a social protection system.
+OP,BO-L1219,,,,YES,Mejora de la calidad y el acceso a los servicios de salud,High,Strong,"Multiple specific objectives directly improve quality and access in health services through detection, vaccination, and service capacity."
+OE,BO-L1220,OE1,Calidad de la informacion estadistica (ROCA),SO1,YES,Fortalecer y modernizar la gestión del sector público.,Low,Weak,"Under the public-management objective (SO 2); the nearest result is 'Mejorar la simplificación administrativa y la digitalización.', but improving ROCA of official statistics does not by itself simplify or digitize administrative procedures."
+OE,BO-L1220,OE2,Fortalecer la institucionalidad del INE,SO1,YES,Fortalecer y modernizar la gestión del sector público.,Low,Weak,"Under the public-management objective (SO 2); the nearest result is 'Mejorar la simplificación administrativa y la digitalización.', but strengthening the INE—a public-sector statistical agency serving the whole government—does not in itself evidence simplification or digitization."
+OP,BO-L1220,,,,YES,Fortalecer y modernizar la gestión del sector público.,Low,Weak,"The operation’s objectives act upon government-wide statistical capacity, connecting generally to the public-management objective without evidencing the specific simplification/digitalization result."
+OE,BO-L1222,OE1,Aumentar cobertura de electricidad rural,ER1,YES,Mejora de la calidad y el acceso a la electricidad en zonas rurales,High,Strong,"Under the SO 6 objective on basic services, this OE directly seeks to incrementar la cobertura de electricidad rural, matching the access and quality result."
+OE,BO-L1222,OE2,Usos productivos de electricidad con enfoque de genero,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Acts upon the electricity service under SO 6 via promotion of productive uses in rural areas; the closest RE is Mejora de la calidad y el acceso a la electricidad en zonas rurales, but it falls short because it does not expand access or quality."
+OE,BO-L1222,OE3,Capacidad institucional para planificar electrificacion rural,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Acts upon the electricity service under SO 6 by strengthening planning capacity for rural electrification; the closest RE is Mejora de la calidad y el acceso a la electricidad en zonas rurales, but it falls short because planning capacity alone does not directly increase access."
+OP,BO-L1222,,,,YES,Mejora de la calidad y el acceso a la electricidad en zonas rurales,High,Strong,At least one specific objective aligns strongly and directly with increased rural electricity access.
+OE,BO-L1225,OE1,Mejorar circulación en la vía intervenida,SO1,YES,Mejora de la infraestructura productiva y la tecnología,Low,Weak,"Under SO 4 Mejora de la infraestructura productiva y la tecnología, the works improve road connectivity in transport (division INE/TSP) but no RE under this objective measures transport performance; the closest is RE 4.2 on incrementar la inversión productiva, which improved road conditions do not evidence directly."
+OP,BO-L1225,,,,YES,Mejora de la infraestructura productiva y la tecnología,Low,Weak,"The operation acts on transport connectivity, aligning generally with SO 4 on infrastructure and technology without evidencing a specific result."
+OE,BO-L1226,OE1,Gobernanza del recurso hídrico,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Under the water and sanitation objective, the closest RE is 'Mejora de la calidad y el acceso a servicios de agua y saneamiento', but strengthening irrigation water governance does not by itself change WSS service quality or access."
+OE,BO-L1226,OE2,Eficiencia del agua para riego,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Under the water and sanitation objective, the closest RE is 'Mejora de la calidad y el acceso a servicios de agua y saneamiento', but increasing irrigation efficiency targets agricultural water use rather than WSS service quality or access."
+OE,BO-L1226,OE3,Productividad agrícola y resiliencia climática,SO1,YES,Mejora de la infraestructura productiva y la tecnología,Low,Weak,"Under the productive infrastructure and technology objective, the closest RE is 'Incrementar la inversión productiva', but the OE seeks higher agricultural productivity and climate resilience rather than increased productive investment or financing."
+OP,BO-L1226,,,,YES,Mejorar la prestación de servicios básicos.,Low,Weak,Two specific objectives connect to the water and sanitation objective at a general level without evidencing a specific result.
+OP,BO-L1226,,,,YES,Mejora de la infraestructura productiva y la tecnología,Low,Weak,One specific objective connects to the productive infrastructure and technology objective at a general level without evidencing a specific result.
+OE,BO-L1229,OE1,Mejorar accesibilidad y sostenibilidad de Mi Teleférico,ER1,YES,Acceso a la infraestructura urbana.,Low,Weak,"Under the basic-services objective (SO 6), the words 'mejorar la accesibilidad del área de influencia de la Línea Café' indicate improved access to urban infrastructure, and division INE/TSP confirms the transport sector."
+OP,BO-L1229,,,,YES,Acceso a la infraestructura urbana.,Low,Weak,"The general objective names improved accessibility in the area of influence, aligning with access to urban infrastructure."
+OE,BO-L1230,OE1,Descarbonizacion del sistema electrico mediante EE en AP,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Under the basic services objective, the general objective's words 'descarbonización del sistema eléctrico boliviano' via 'medidas de Eficiencia Energética (EE) en los sistemas de AP' act upon electricity services (division INE/ENE), but the nearest result is on rural electricity access, which this efficiency-focused goal does not evidence."
+OP,BO-L1230,,,,YES,Mejorar la prestación de servicios básicos.,Low,Weak,Only the general objective aligns at the sectoral level with basic services without evidencing a specific result.
+OE,BO-L1233,OE1,Acceso a espacios públicos y movilidad sostenible,ER1,YES,Acceso a la infraestructura urbana.,High,Strong,"Under the SO 6 objective on basic services, this OE explicitly targets access to urban infrastructure through 'espacios públicos' and 'infraestructura de movilidad sostenible'."
+OE,BO-L1233,OE2,Mejorar movilidad urbana en el Centro Histórico,ER1,YES,Acceso a la infraestructura urbana.,High,Strong,"Under the SO 6 objective on basic services, improving urban mobility infrastructure in the Centro Histórico advances access to urban infrastructure, as reflected by the travel time indicator."
+OE,BO-L1233,OE3,Eficiencia energética en alumbrado público,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Acts upon a basic urban service under SO 6; the nearest RE is 'Acceso a la infraestructura urbana', but replacing luminarias and digitalization improve efficiency rather than directly expanding access."
+OE,BO-L1233,OE4,Fortalecer planificación y gestión urbana,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"Strengthens the municipal public entity that executes the urban sector under SO 6; the nearest RE is 'Acceso a la infraestructura urbana', but plans and training do not by themselves ensure increased access."
+OP,BO-L1233,,,,YES,Acceso a la infraestructura urbana.,High,Strong,"OE1 and OE2 directly advance access to urban infrastructure under SO 6, with strong and feasible evidence."
+OP,BO-L1233,,,,YES,Mejorar la prestación de servicios básicos.,Low,Weak,OE3 and OE4 act upon the basic services objective at a general level without evidencing a specific result.
+OE,BO-L1234,OE1,Bienestar de la agricultura familiar y conservación de bosques,ER1,YES,Mejorar la simplificación administrativa y la digitalización.,Low,Weak,"Bajo el objetivo de gestión pública, las palabras 'aumentar la eficiencia y la inclusión en el funcionamiento del sistema catastral rural' evidencian mejoras en un sistema público alineadas con simplificación y digitalización, y la división PTI/ARD orienta el sector."
+OE,BO-L1234,OE1,Bienestar de la agricultura familiar y conservación de bosques,ER2,YES,Mayor eficiencia del sector público,Low,Weak,"Bajo el objetivo de sostenibilidad fiscal, las palabras 'aumentar la eficiencia y la inclusión en el funcionamiento del sistema catastral rural' apuntan a eficiencia en una entidad pública, y la división PTI/ARD respalda esta lectura sectorial."
+OP,BO-L1234,,,,YES,Mejorar la simplificación administrativa y la digitalización.,Low,Weak,"El objetivo general nombra eficiencia e inclusión en el sistema catastral rural, conectando con simplificación y digitalización."
+OP,BO-L1234,,,,YES,Mayor eficiencia del sector público,Low,Weak,"El objetivo general menciona eficiencia en el funcionamiento del sistema catastral rural, contribuyendo a mayor eficiencia del sector público."
+OE,BO-L1237,OE1,Seguridad hidrica urbana para consumo humano,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,Low,Weak,"Under the basic services objective, division INE/WSA guided the sector; the words 'seguridad hidrica' and 'disponibilidad sostenible del recurso para consumo humano' show action on water supply, aligning with improving the quality and access to water and sanitation services."
+OP,BO-L1237,,,,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,Low,Weak,"The general objective names action on water supply for human consumption, aligning with the water and sanitation result under the basic services objective."
+OE,BO-L1238,OE1,Servicio electrico confiable y costo-efectivo en el Norte Amazonico,SO1,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"The words 'provision de un servicio electrico confiable y costo-efectivo' act upon electricity service under the basic-services objective (division INE/ENE), but the closest result is 'Mejora de la calidad y el acceso a la electricidad en zonas rurales' and the general objective does not specify rural coverage."
+OP,BO-L1238,,,,YES,Mejorar la prestación de servicios básicos.,Low,Weak,"The general objective targets electricity service quality and cost-effectiveness within the basic-services objective, without evidencing a specific result."
+OE,BO-L1243,OE1,Credito productivo de largo plazo a PyME,ER1,YES,Mayor acceso a la financiación para el sector privado.,High,Strong,"Bajo el objetivo SO 4, las palabras 'expandir el credito productivo de largo plazo a PyME' y la division IFD/CMF evidencian mayor acceso a financiamiento para el sector privado."
+OE,BO-L1243,OE1,Credito productivo de largo plazo a PyME,ER2,YES,Incrementar la inversión productiva.,Low,Weak,"Bajo el objetivo SO 4, las palabras 'Contribuir al aumento de las inversiones productivas de pequenas y medianas empresas' apoyan este resultado, aunque expandir credito por si solo no garantiza mayor inversion."
+OP,BO-L1243,,,,YES,Mayor acceso a la financiación para el sector privado.,High,Strong,"El objetivo general apunta a expandir el credito productivo de largo plazo a PyME, lo que incrementa el acceso a financiamiento privado bajo el SO 4."
+OP,BO-L1243,,,,YES,Incrementar la inversión productiva.,Low,Weak,"El objetivo general declara contribuir al aumento de las inversiones productivas de PyME, alineando debilmente con este resultado del SO 4."
+OE,BO-L1245,OE1,Mitigar efectos y crear registro social,ER1,YES,Crear y fortalecer sistema de protección social,High,Strong,"Bajo el objetivo de mejor focalización de las políticas sociales, las palabras 'la creación de un registro social (RS) que permita la gestión eficiente de recursos del Estado orientados al alivio de la pobreza' evidencian la creación/fortalecimiento del sistema de protección social, y la división SCL/SPL confirma el sector."
+OE,BO-L1245,OE1,Mitigar efectos y crear registro social,ER2,YES,Mejorar la simplificación administrativa y la digitalización.,Low,Weak,"Bajo el objetivo de gestión del sector público, la 'creación de un registro social (RS)' implica un sistema público de información que contribuye a la digitalización y simplificación, aunque su alcance es sectorial y no asegura mejoras generales del aparato público, y la división SCL/SPL indica que el foco principal es social."
+OP,BO-L1245,,,,YES,Crear y fortalecer sistema de protección social,High,Strong,La conexión principal es con la creación/fortalecimiento del sistema de protección social evidenciada por el registro social para aliviar la pobreza.
+OP,BO-L1245,,,,YES,Mejorar la simplificación administrativa y la digitalización.,Low,Weak,La creación de un registro social público aporta a la digitalización y simplificación administrativa aunque de alcance acotado.
+OE,BO-L1247,OE1,Contribuir a la estabilidad macroeconomica,ER1,YES,Contribuir consolidación fiscal,Low,Weak,"Under the fiscal sustainability objective, the words 'fortalecer las finanzas públicas' in the general objective point to contributing to fiscal consolidation, and division IFD/FMM confirms the sector."
+OP,BO-L1247,,,,YES,Contribuir consolidación fiscal,Low,Weak,"The general objective evidences the fiscal sustainability objective via 'fortalecer las finanzas públicas', with division IFD/FMM confirming the sector."
+OE,BO-L1248,OE1,Sostenibilidad fiscal,ER1,YES,Contribuir consolidación fiscal,Low,Weak,"Under the fiscal objective (SO 1), the words 'contribuir a la sostenibilidad fiscal' directly relate to consolidation, and division IFD/FMM confirms the sector."
+OP,BO-L1248,,,,YES,Contribuir consolidación fiscal,Low,Weak,"The general objective explicitly targets fiscal sustainability, which aligns with the consolidation result under the fiscal objective."
+OE,BO-L1251,OE1,Entorno institucional y regulatorio para el sector privado,ER1,YES,Un marco normativo y regulatorio fortalecido para la inversión privada.,Low,Weak,"Bajo el objetivo de Mayor integración comercial, las palabras del objetivo general 'incrementar las capacidades del Estado... entorno institucional y regulatorio que facilite el desarrollo del sector privado' apuntan a un marco regulatorio fortalecido para la inversión privada."
+OE,BO-L1251,OE1,Entorno institucional y regulatorio para el sector privado,SO1,YES,Fortalecer y modernizar la gestión del sector público.,Low,Weak,"Pertenece al objetivo de gestión pública; el RE más cercano es 'Mejorar la simplificación administrativa y la digitalización.' pero el objetivo general solo alude a 'entorno institucional y regulatorio...' sin mencionar simplificación o digitalización, y la división IFD/ICS orienta al sector."
+OP,BO-L1251,,,,YES,Un marco normativo y regulatorio fortalecido para la inversión privada.,Low,Weak,El objetivo general se alinea débilmente con este resultado al priorizar un entorno institucional y regulatorio pro-inversión.
+OP,BO-L1251,,,,YES,Fortalecer y modernizar la gestión del sector público.,Low,Weak,El objetivo general actúa sobre la gestión pública en términos amplios sin evidenciar un resultado específico bajo ese objetivo.
+OE,BO-L1252,OE1,Resiliencia fiscal y gestion financiera del riesgo de desastres,ER1,YES,Contribuir consolidación fiscal,Low,Weak,"Under the fiscal sustainability objective, the phrases 'resiliencia fiscal' and 'fortalecer la gestión financiera de riesgos de desastres para reducir la vulnerabilidad fiscal del Estado' indicate contribution to fiscal consolidation, with division CSD/DRM guiding the sector."
+OE,BO-L1252,OE1,Resiliencia fiscal y gestion financiera del riesgo de desastres,SO2,YES,Fortalecer y modernizar la gestión del sector público.,Low,Weak,"It acts upon public-sector management via 'fortalecer la gobernanza y las capacidades institucionales' for gestión del riesgo de desastres, but the closest result is 'Mejorar la simplificación administrativa y la digitalización', which it does not specifically target."
+OP,BO-L1252,,,,YES,Contribuir consolidación fiscal,Low,Weak,"The general objective names 'resiliencia fiscal' and reducing fiscal vulnerability through risk financing, which contributes to fiscal consolidation."
+OP,BO-L1252,,,,YES,Fortalecer y modernizar la gestión del sector público.,Low,Weak,"The operation strengthens governance and institutional capacity for DRM, aligning to the public-management objective without evidencing its specific result."
+OE,BO-L1254,OE1,Gestion educativa para mejorar aprendizaje,SO1,YES,Fortalecer y modernizar la gestión del sector público.,Low,Weak,"Bajo el objetivo de gestión del sector público, las palabras 'fortalecimiento de la gestión educativa' y 'gestión eficiente y efectiva del personal docente' muestran actuación sobre la gestión pública en educación (división SCL/EDU), pero el RE más cercano es 'Mejorar la simplificación administrativa y la digitalización.' que no se evidencia explícitamente."
+OP,BO-L1254,,,,YES,Fortalecer y modernizar la gestión del sector público.,Low,Weak,"La operación actúa sobre la gestión pública del sector educativo sin evidenciar simplificación o digitalización, por lo que la conexión es a nivel del objetivo."
+OE,BO-T1385,OE1,Fundraising for Consolidation Fund,,NO,None,,,"The fundraising for a consolidation fund for basin management does not evidence any of the strategy's specific results on fiscal sustainability, public management, trade, finance, social policy, or basic services."
+OE,BO-T1385,OE2,Sustainable forest management in lowlands,,NO,None,,,"The sustainable management of forests in the lowlands does not correspond to any listed expected result or objective, and it does not act upon water and sanitation service access or quality."
+OE,BO-T1385,OE3,Territorial consolidation of TIOC in lowlands,,NO,None,,,The territorial consolidation of TIOC does not match any of the strategy's expected results or sectoral objectives provided.
+OP,BO-T1385,,,,NO,None,,,"The operation’s specific objectives focus on watershed governance, forests, and territorial consolidation, none of which correspond to the strategy’s expected results."
+OE,BO-T1393,OE1,Diseno de subproyectos de electrificacion rural en Amazonia,ER1,YES,Mejora de la calidad y el acceso a la electricidad en zonas rurales,,,"Bajo el objetivo de mejorar la prestacion de servicios basicos, el diseno de subproyectos de electrificacion rural en la Amazonia se orienta directamente a mejorar el acceso y la calidad del servicio electrico en zonas rurales."
+OE,BO-T1393,OE2,Tecnologias eficientes y costo-eficaces en inversiones de electrificacion rural,ER1,YES,Mejora de la calidad y el acceso a la electricidad en zonas rurales,,,"Bajo el objetivo de mejorar la prestacion de servicios basicos, el uso de tecnologias eficientes en la electrificacion rural contribuye a la calidad del servicio electrico en zonas rurales."
+OE,BO-T1393,OE3,Diversificacion del suministro con energias renovables en zonas rurales,ER1,YES,Mejora de la calidad y el acceso a la electricidad en zonas rurales,,,"Bajo el objetivo de mejorar la prestacion de servicios basicos, diversificar el suministro con energias renovables en areas rurales apunta a mejorar la calidad y el acceso a la electricidad en dichas zonas."
+OE,BO-T1393,OE4,Promocion de actividades productivas con energia electrica en areas rurales,,NO,None,,,"Este OE no evidencia ningun resultado ni objetivo de la estrategia, pues promover actividades productivas no corresponde directamente a los resultados de acceso o calidad de servicios ni a otros RE listados."
+OE,BO-T1393,OE5,Fortalecimiento de capacidades institucionales de unidades ejecutoras,SO1,YES,Mejorar la prestacion de servicios basicos.,,,"El fortalecimiento institucional de unidades ejecutoras del sector electrico actua sobre el objetivo de servicios basicos; el RE mas cercano es 'Mejora de la calidad y el acceso a la electricidad en zonas rurales', pero la mejora de capacidades por si sola no evidencia ese resultado."
+OP,BO-T1393,,,,YES,Mejora de la calidad y el acceso a la electricidad en zonas rurales,,,Varios objetivos especificos de la CT se conectan con este resultado mediante acciones de diseno y mejoras tecnicas para la electrificacion rural.
+OE,BO-T1398,OE1,Apoyo a preparación e implementación en salud (infraestructura y nutrición),ER1,YES,Mejora de la calidad y el acceso a los servicios de salud,,,"Bajo el objetivo de servicios básicos (salud), el OE orienta la mejora de la infraestructura y la prestación sanitaria y las acciones de nutrición, lo que apunta a mejorar la calidad y el acceso a los servicios de salud."
+OP,BO-T1398,,,,YES,Mejora de la calidad y el acceso a los servicios de salud,,,"La CT apoya infraestructura, gestión sanitaria y nutrición, conectando con la mejora de la calidad y el acceso a los servicios de salud."
+OE,BO-T1399,OE1,Diagnostico del sistema de informacion educativa,ER1,YES,Mejorar la simplificacion administrativa y la digitalizacion.,,,"Bajo el objetivo de fortalecer y modernizar la gestion del sector publico, el diagnostico del sistema de informacion educativa contribuye a la simplificacion administrativa y la digitalizacion que mide el RE 2.1."
+OE,BO-T1399,OE2,Diseno de observatorio sobre idiomas originarios,ER1,YES,Mejorar la simplificacion administrativa y la digitalizacion.,,,"Bajo el objetivo de fortalecer y modernizar la gestion del sector publico, el diseno de un observatorio nacional de idiomas originarios es una iniciativa de digitalizacion y gestion de informacion publica coherente con el RE 2.1."
+OE,BO-T1399,OE3,Herramienta para evaluar implementacion de Curriculos Regionalizados,ER1,YES,Mejorar la simplificacion administrativa y la digitalizacion.,,,"Bajo el objetivo de fortalecer y modernizar la gestion del sector publico, la herramienta para evaluar la implementacion curricular apoya la gestion publica con instrumentos digitales ligados a la simplificacion y digitalizacion del RE 2.1."
+OP,BO-T1399,,,,YES,Mejorar la simplificacion administrativa y la digitalizacion.,,,"Bajo el objetivo de fortalecer y modernizar la gestion del sector publico, varias OEs se conectan al RE 2.1 mediante sistemas de informacion, observatorios y herramientas de evaluacion en el sector educativo."
+OE,BO-T1409,OE1,Mejorar calidad del cuidado obstetrico y evitar violencia obstetrica,ER1,YES,Mejora de la calidad y el acceso a los servicios de salud,,,"Bajo el objetivo de servicios básicos (SO 6), el OE busca 'mejorar la calidad de la atención' en el cuidado obstétrico y prevenir la violencia obstétrica, lo que evidencia la mejora de la calidad de los servicios de salud (RE 6.3)."
+OP,BO-T1409,,,,YES,Mejora de la calidad y el acceso a los servicios de salud,,,"La operación apunta a mejorar la calidad de la atención obstétrica, alineándose fuertemente con el resultado de calidad de los servicios de salud (SO 6, RE 6.3)."
+OE,BO-T1411,OE1,Fortalecimiento de la capacidad del VIPFE,SO1,YES,Fortalecer y modernizar la gestión del sector público.,,,"Under the public-management objective, the closest result is on administrative simplification and digitalization, but the OE only states strengthening the institutional capacity of the Pre-Investment Unit of VIPFE (a public-sector entity) without committing to simplification or digital services."
+OP,BO-T1411,,,,YES,Fortalecer y modernizar la gestión del sector público.,,,"The operation strengthens management capacity in VIPFE, connecting generally to the public-management objective without evidencing RE 2.1."
+OE,BO-T1416,OE1,Fortalecimiento de gestion de datos y AP en energia,ER1,YES,Mejorar la simplificación administrativa y la digitalización.,,,"Bajo el objetivo 'Fortalecer y modernizar la gestión del sector público', las instituciones del sector energético (entidades públicas) serán fortalecidas en gestión de datos y adopción de nuevas tecnologías, lo que constituye digitalización y simplificación administrativa medida por este resultado."
+OE,BO-T1416,OE1,Fortalecimiento de gestion de datos y AP en energia,SO1,YES,Mejorar la prestación de servicios básicos.,,,"Actúa sobre la prestación de servicios básicos (electricidad y alumbrado público); el RE más cercano es 'Acceso a la infraestructura urbana.', pero se queda corto porque la CT aborda planificación, datos y eficiencia más que expandir acceso."
+OP,BO-T1416,,,,YES,Mejorar la simplificación administrativa y la digitalización.,,,La CT conecta con este resultado mediante el fortalecimiento de gestión de datos y tecnologías en instituciones públicas del sector energía.
+OP,BO-T1416,,,,YES,Mejorar la prestación de servicios básicos.,,,"La CT incide de forma general en la prestación de servicios básicos a través de alumbrado público y eficiencia, sin evidenciar un resultado específico bajo ese objetivo."
+OE,BO-T1417,OE1,Gestion de riesgo de cumplimiento tributario,ER1,YES,Mayor eficiencia del sector público,,,"Under the fiscal sustainability objective, strengthening compliance risk management in the Servicio de Impuestos Nacionales (a public-sector tax agency) makes tax administration more efficient in combating fraud, though many factors affect overall public-sector efficiency."
+OE,BO-T1417,OE1,Gestion de riesgo de cumplimiento tributario,ER2,YES,Contribuir consolidación fiscal,,,"Under the fiscal sustainability objective, improving compliance risk management in the Servicio de Impuestos Nacionales (a public-sector tax agency) supports revenue mobilization against tax fraud, but broader fiscal consolidation depends on multiple policies beyond this OE."
+OP,BO-T1417,,,,YES,Mayor eficiencia del sector público,,,"The operation strengthens compliance risk management in the tax authority, contributing to public-sector efficiency."
+OP,BO-T1417,,,,YES,Contribuir consolidación fiscal,,,"The operation targets better compliance risk management to fight tax fraud, which supports fiscal consolidation though not sufficient on its own."
+OE,BO-T1418,OE1,Fortalecimiento de capacidad para gestion y supervision de empresas publicas,ER1,YES,Mayor eficiencia del sector público,,,"Bajo el objetivo de sostenibilidad fiscal, el fortalecimiento del MEFP (un ministerio de finanzas publico) para mejorar la gobernanza y la gestion presupuestaria y financiera de las EPE apoya una mayor eficiencia del sector público."
+OE,BO-T1418,OE1,Fortalecimiento de capacidad para gestion y supervision de empresas publicas,SO1,YES,Fortalecer y modernizar la gestión del sector público.,,,"Bajo el objetivo de gestion del sector público, la OE actua sobre el MEFP (ministerio publico de alcance gubernamental) para la supervision de EPE; el RE mas cercano es 'Mejorar la simplificación administrativa y la digitalización.' pero la OE no explicita simplificacion ni digitalizacion."
+OP,BO-T1418,,,,YES,Mayor eficiencia del sector público,,,"La CT conecta con este resultado al fortalecer la gestion y el control de las EPE desde el MEFP, impulsando la eficiencia del sector público."
+OP,BO-T1418,,,,YES,Fortalecer y modernizar la gestión del sector público.,,,"La CT actua sobre la gestion publica a nivel del MEFP, sin evidenciar un RE especifico bajo este objetivo."
+OE,BO-T1419,OE1,Atlas linguistico aprobado,,NO,None,,,Un atlas linguistico de comunidades indigenas no corresponde a ningun resultado u objetivo listado en la estrategia.
+OE,BO-T1419,OE2,Marco de gobernanza del uso del agua aprobado,SO1,YES,Mejorar la prestación de servicios básicos.,,,"Actua sobre el sector de servicios básicos; el RE más cercano es 'Mejora de la calidad y el acceso a servicios de agua y saneamiento', pero un marco de gobernanza por sí solo no evidencia mejoras directas en acceso o calidad."
+OE,BO-T1419,OE3,Reporte sobre potencial productivo de la Amazonia aprobado,SO1,YES,Mejora de la infraestructura productiva y la tecnología,,,"Actua sobre el fomento de la inversión y la infraestructura productiva; el RE más cercano es 'Incrementar la inversión productiva', pero un reporte diagnóstico no demuestra incrementos de inversión por sí mismo."
+OE,BO-T1419,OE4,Estudios de factibilidad para infraestructura sostenible preparados,SO1,YES,Mejora de la infraestructura productiva y la tecnología,,,"Actua sobre la infraestructura productiva; el RE más cercano es 'Incrementar la inversión productiva', pero la preparación de estudios no garantiza aumentos efectivos de inversión."
+OP,BO-T1419,,,,YES,Mejorar la prestación de servicios básicos.,,,"Una OE conecta a nivel de objetivo con servicios básicos al proponer un marco de gobernanza del agua, sin evidenciar un resultado específico."
+OP,BO-T1419,,,,YES,Mejora de la infraestructura productiva y la tecnología,,,Dos OE conectan a nivel de objetivo con infraestructura productiva al preparar insumos para inversión sin evidenciar resultados específicos.
+OE,BO-T1421,OE1,Estrategia para mejorar cobertura y calidad de ECD,SO1,YES,Mejor focalización de las políticas sociales,,,"Actúa sobre servicios de primera infancia, por lo que corresponde al objetivo 'Mejor focalización de las políticas sociales'; el RE más cercano es 'Crear y fortalecer sistema de protección social', pero la OE se limita a implementar una estrategia de mejora de servicios de ECD en dos departamentos y no evidencia la creación o fortalecimiento del sistema."
+OP,BO-T1421,,,,YES,Mejor focalización de las políticas sociales,,,"La operación se vincula de forma general al objetivo 'Mejor focalización de las políticas sociales', sin evidenciar un resultado específico de dicho objetivo."
+OE,BO-T1422,OE1,Mejora del modelo de atención materna y neonatal en la Amazonía,ER1,YES,Mejora de la calidad y el acceso a los servicios de salud,,,"Bajo el objetivo de servicios básicos (SO 6), el OE busca mejorar la calidad y el acceso de los servicios de salud materna y neonatal en la región amazónica."
+OP,BO-T1422,,,,YES,Mejora de la calidad y el acceso a los servicios de salud,,,"La CT se alinea con el objetivo de servicios básicos (SO 6) al mejorar el modelo de atención de salud materna y neonatal, incidiendo en la calidad y acceso de los servicios de salud."
+OE,BO-T1423,OE1,Integracion de accion climatica en gestion fiscal del MEFP,SO1,YES,Fortalecer y modernizar la gestión del sector público.,,,"Bajo el objetivo de gestión pública, el OE actúa sobre el Ministerio de Economía y Finanzas Públicas (entidad pública de alcance gubernamental) para integrar la acción climática en la política y gestión fiscal; el RE más cercano es 'Mejorar la simplificación administrativa y la digitalización.' pero el OE no trata de simplificación ni digitalización."
+OP,BO-T1423,,,,YES,Fortalecer y modernizar la gestión del sector público.,,,La cooperación se conecta a este objetivo al apoyar al ministerio rector de finanzas públicas en integrar la acción climática en la gestión fiscal.
+OE,BO-T1425,OE1,Strengthen capacities for strategic basin planning,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,,,"Under the 'Mejorar la prestación de servicios básicos' objective, the OE strengthens the public-sector Autoridad Binacional del Lago Titicaca (ALT) and basin planning for water and sanitation, which connects to improving the quality and access to WSS."
+OP,BO-T1425,,,,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,,,The TC aligns by strengthening ALT and strategic basin planning for water and sanitation under the basic services objective.
+OE,BO-T1427,OE1,Politica nacional de datos y capacidades,ER1,YES,Mejorar la simplificación administrativa y la digitalización.,,,"Bajo el objetivo de gestion publica, el diseño de un marco integral de política de datos y el establecimiento de capacidades institucionales apuntan directamente a la simplificación administrativa y la digitalización (objetivo 'Fortalecer y modernizar la gestión del sector público.')."
+OP,BO-T1427,,,,YES,Mejorar la simplificación administrativa y la digitalización.,,," ""La CT se conecta a este resultado mediante el diseño de una política nacional de datos y el fortalecimiento de capacidades institucionales para su implementación."""
+OE,BO-T1428,OE1,Prevencion de ciberviolencia en escuelas,SO1,YES,Fortalecer y modernizar la gestión del sector público.,,,"Under the public-sector management objective, the nearest result is on simplification and digitalization, but the OE and general objective act on strengthening investigative/prosecutorial capacity in the security and justice sector rather than simplification or digital services."
+OP,BO-T1428,,,,YES,Fortalecer y modernizar la gestión del sector público.,,,The operation connects at an objective level by strengthening institutional capacity in the security and justice sector without evidencing a specific simplification/digitalization result.
+OE,BO-T1429,OE1,Territorial consolidation of TIOC,SO1,YES,Fortalecer y modernizar la gestión del sector público.,,,"Acts upon public-sector management via INRA (a public land agency) and the TIOC Consolidation Fund; the nearest result is 'Mejorar la simplificación administrativa y la digitalización.', but territorial consolidation/regulatory setup does not itself evidence simplification or digitalization."
+OE,BO-T1429,OE2,Sustainable management of forest,SO1,YES,Fortalecer y modernizar la gestión del sector público.,,,"Targets management improvements through INRA (a public land agency) and prioritized TIOC for sustainable forest management; the nearest result is 'Mejorar la simplificación administrativa y la digitalización.', which is not directly evidenced by these sectoral actions."
+OE,BO-T1429,OE3,Fundraising for the Consolidation Fund,SO1,YES,Fortalecer y modernizar la gestión del sector público.,,,"Focuses on establishing and administering a public Consolidation Fund (INRA involved), with the closest result being 'Mejorar la simplificación administrativa y la digitalización.', which is not evidenced by fundraising or fund setup per se."
+OP,BO-T1429,,,,YES,Fortalecer y modernizar la gestión del sector público.,,,"The operation’s objectives act upon public-sector management via INRA and the TIOC Consolidation Fund, without evidencing the specific simplification/digitalization result."
+OE,BO-T1431,OE1,Publicacion de permisos y licencias en web de ABT,ER1,YES,Mejorar la simplificación administrativa y la digitalización.,,,"Bajo el objetivo de fortalecer y modernizar la gestión del sector público (SO 2), la publicación de permisos y licencias digitaliza y simplifica trámites en la ABT, evidenciando la RE 2.1."
+OE,BO-T1431,OE2,Publicacion de mapas en web de ABT,ER1,YES,Mejorar la simplificación administrativa y la digitalización.,,,"Bajo el objetivo de fortalecer y modernizar la gestión del sector público (SO 2), la difusión digital de mapas moderniza y digitaliza la gestión de información, consistente con la RE 2.1."
+OE,BO-T1431,OE3,Aprobacion de planes de manejo de comunidades indigenas,SO1,YES,Fortalecer y modernizar la gestión del sector público.,,,"Actúa sobre la gestión de la ABT (entidad pública sectorial) bajo el objetivo SO 2; la RE más cercana es la de simplificación y digitalización, pero la aprobación de planes no explicita simplificación ni digitalización."
+OP,BO-T1431,,,,YES,Mejorar la simplificación administrativa y la digitalización.,,,Al menos un objetivo específico evidencia directamente la RE 2.1 mediante la digitalización de información y trámites en la ABT.
+OE,BO-T1433,OE1,Mejora del desempeño de prestadores de AyS,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,,,"Bajo el objetivo de servicios básicos, el OE busca mejorar la calidad y sostenibilidad de la prestación de servicios de AyS por las EPSA, lo que se vincula con la mejora de la calidad y el acceso al agua y saneamiento."
+OP,BO-T1433,,,,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,,,"La CT se orienta a mejorar la prestación de servicios de AyS por las EPSA, conectando con la mejora de la calidad y el acceso a estos servicios."
+OE,BO-T1434,OE1,Aprobacion del Programa Nacional de Drenaje Pluvial,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,,,"Under the objective 'Mejorar la prestación de servicios básicos', the TC prepares and secures approval for a national storm drainage program and related preinvestment in the water and sanitation sector, which connects to improving the quality and access to water and sanitation services."
+OP,BO-T1434,,,,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,,,The TC connects to this result via the preparation and approval of a national storm drainage program in the water and sanitation sector.
+OE,BO-T1435,OE1,Fortalecimiento de SISRADE para gestion de riesgos,SO1,YES,Fortalecer y modernizar la gestión del sector público.,,,"Bajo el objetivo de gestión del sector público, SISRADE es un ente público y el OE actúa sobre su capacidad de gestión de riesgos; el RE más cercano es la simplificación y digitalización, pero el OE no aborda simplificación administrativa ni digitalización."
+OE,BO-T1435,OE2,Estrategia de protección financiera de desastres en MEFP,SO1,YES,Promover la sostenibilidad fiscal,,,"Bajo el objetivo de sostenibilidad fiscal, fortalecer al MEFP para una estrategia de protección financiera de desastres actúa sobre la gestión de pasivos contingentes; el RE más cercano es contribuir a la consolidación fiscal, pero diseñar la estrategia no evidencia ese resultado."
+OP,BO-T1435,,,,YES,Fortalecer y modernizar la gestión del sector público.,,,"Al menos un OE se conecta a este objetivo de forma general, sin evidenciar un resultado específico."
+OP,BO-T1435,,,,YES,Promover la sostenibilidad fiscal,,,"Al menos un OE se conecta a este objetivo de forma general, sin evidenciar un resultado específico."
+OE,BO-T1436,OE1,Aprobacion del Programa BO-L1237,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,,,"Bajo el objetivo de mejorar la prestación de servicios básicos, la OE logra la aprobación de un programa de seguridad hídrica y saneamiento urbano, lo que se vincula con mejorar la calidad y el acceso a servicios de agua y saneamiento."
+OP,BO-T1436,,,,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,,,La CT se vincula a este resultado al preparar y apoyar la aprobación de un programa de agua y saneamiento urbano bajo el objetivo de servicios básicos.
+OE,BO-T1437,OE1,Plan de desarrollo urbano,ER1,YES,Acceso a la infraestructura urbana.,,,"Bajo el objetivo 'Mejorar la prestación de servicios básicos', un plan de desarrollo urbano orienta intervenciones que mejoran el acceso a infraestructura urbana (SO 6, RE 6.4)."
+OE,BO-T1437,OE2,Plan turístico urbano,SO1,NO,None,,,"No evidencia directa de los resultados listados ni del objetivo sectorial correspondiente, pues un plan turístico urbano no se vincula explícitamente a los RE disponibles."
+OE,BO-T1437,OE3,"Plan de movilidad, PROMUT y ciclovías",ER1,YES,Acceso a la infraestructura urbana.,,,"Bajo el objetivo 'Mejorar la prestación de servicios básicos', el plan de movilidad y las ciclovías amplían el acceso a infraestructura urbana (SO 6, RE 6.4)."
+OE,BO-T1437,OE4,Diagnóstico de gestión del impuesto inmobiliario,ER1,YES,Mayor eficiencia del sector público,,,"Bajo el objetivo 'Promover la sostenibilidad fiscal', diagnosticar capacidades para gestionar el impuesto predial apunta a mejorar la eficiencia del sector público (SO 1, RE 1.1)."
+OE,BO-T1437,OE4,Diagnóstico de gestión del impuesto inmobiliario,ER2,YES,Contribuir consolidación fiscal,,,"Bajo el objetivo 'Promover la sostenibilidad fiscal', mejorar la efectividad del recaudo del impuesto predial contribuye a la consolidación fiscal (SO 1, RE 1.2)."
+OE,BO-T1437,OE5,Piloto de capacitación laboral,SO1,NO,None,,,"No evidencia directa de los resultados listados, pues el piloto de capacitación laboral no corresponde a los RE disponibles."
+OP,BO-T1437,,,,YES,Acceso a la infraestructura urbana.,,,"Los OEs de desarrollo urbano y movilidad se conectan con el acceso a infraestructura urbana (SO 6, RE 6.4)."
+OP,BO-T1437,,,,YES,Mayor eficiencia del sector público,,,"El diagnóstico para mejorar la gestión del impuesto predial se alinea con la eficiencia del sector público (SO 1, RE 1.1)."
+OP,BO-T1437,,,,YES,Contribuir consolidación fiscal,,,"El enfoque en la efectividad del recaudo del impuesto predial contribuye a la consolidación fiscal (SO 1, RE 1.2)."
+OE,BO-T1440,OE1,Analisis de barreras de insercion e inclusion laboral y propuestas de politica,SO1,YES,Mejor focalización de las políticas sociales,,,"Actúa sobre la inclusión laboral de grupos con retos en el mercado de trabajo dentro del objetivo social; el RE más cercano es 'Crear y fortalecer sistema de protección social', pero el OE se limita a análisis y propuestas y no a crear o fortalecer dicho sistema."
+OE,BO-T1440,OE2,Generacion de informacion para politicas de promocion de empleo,SO1,YES,Mejor focalización de las políticas sociales,,,"Actúa sobre políticas de empleo para poblaciones con retos dentro del objetivo social; el RE más cercano es 'Crear y fortalecer sistema de protección social', pero el OE se centra en generar información para políticas y no en crear o fortalecer el sistema de protección social."
+OP,BO-T1440,,,,YES,Mejor focalización de las políticas sociales,,,"Ambos OEs se enfocan en inclusión laboral y promoción de empleo para poblaciones con retos, conectando al objetivo social sin evidenciar un resultado específico bajo él."
+OE,BO-T1441,OE1,Implementacion de programas para Parques Lineales,ER1,YES,Acceso a la infraestructura urbana.,,,"Bajo el objetivo de mejorar la prestación de servicios básicos, la implementación de programas y estudios/diseños para parques lineales se orienta a ampliar el acceso a infraestructura urbana."
+OP,BO-T1441,,,,YES,Acceso a la infraestructura urbana.,,,La CT se vincula a este resultado al impulsar la implementación y preparaciones para parques lineales que mejoran el acceso a infraestructura urbana.
+OE,BO-T1442,OE1,Movilidad urbana y desempeño logístico,ER1,YES,Acceso a la infraestructura urbana.,,,"Bajo el objetivo de servicios básicos (SO 6), el OE apoya proyectos de movilidad urbana y transporte sostenible que contribuyen al acceso a la infraestructura urbana."
+OP,BO-T1442,,,,YES,Acceso a la infraestructura urbana.,,," ""La CT conecta con este resultado al apoyar preparación y preinversión de proyectos de movilidad urbana y transporte sostenible que amplían la infraestructura urbana."""
+OE,BO-T1443,OE1,Central urban cadastre capacities strengthened,ER1,YES,Mejorar la simplificación administrativa y la digitalización.,,,"Under the public-sector management objective (SO 2), the OE strengthens digital technology and managerial capacity for urban cadastre at the central level, which directly supports administrative simplification and digitalization."
+OP,BO-T1443,,,,YES,Mejorar la simplificación administrativa y la digitalización.,,,The operation connects via its specific objective to the public-sector management result on administrative simplification and digitalization.
+OE,BO-T1444,OE1,Capacidad del MEFP con Lab-IA,ER1,YES,Mejorar la simplificación administrativa y la digitalización.,,,"Under SO 2 (gestión del sector público), implementar un laboratorio de IA en el MEFP y promover la transformación digital evidencian avance en digitalización administrativa."
+OE,BO-T1444,OE1,Capacidad del MEFP con Lab-IA,ER2,YES,Contribuir consolidación fiscal,,,"Bajo SO 1 (sostenibilidad fiscal), el fortalecimiento del MEFP para generar 'políticas fiscales inteligentes' puede contribuir a la consolidación fiscal, aunque por sí solo no la garantiza."
+OP,BO-T1444,,,,YES,Mejorar la simplificación administrativa y la digitalización.,,,La operación avanza la digitalización administrativa mediante la creación y uso del laboratorio de IA en el MEFP.
+OP,BO-T1444,,,,YES,Contribuir consolidación fiscal,,,"El fortalecimiento de capacidades del MEFP para políticas fiscales inteligentes puede aportar a la consolidación fiscal, pero su efecto es indirecto."
+OE,BO-T1445,OE1,Herramientas para la transición energética del NAB,ER1,YES,Mejora de la calidad y el acceso a la electricidad en zonas rurales,,,"Bajo el objetivo SO 6 de mejorar la prestación de servicios básicos, la CT prepara el PTE y provee herramientas de planificación e implementación para la transición energética del NAB, lo que se vincula con mejorar la calidad y el acceso a la electricidad."
+OP,BO-T1445,,,,YES,Mejora de la calidad y el acceso a la electricidad en zonas rurales,,,La CT se conecta a este resultado al apoyar con planificación y herramientas la transición energética en el NAB.
+OE,BO-T1446,OE1,Strengthened Sector Entities and Operators,SO1,YES,Mejorar la prestación de servicios básicos.,,,"Under the basic-services objective, strengthening the public water-sector entity Empresa Misicuni and other operators via planning, capacity building and studies acts upon water and sanitation services, but it falls short of evidencing the nearest RE 'Mejora de la calidad y el acceso a servicios de agua y saneamiento' because it focuses on governance and planning rather than direct service improvements."
+OP,BO-T1446,,,,YES,Mejorar la prestación de servicios básicos.,,,"The operation strengthens water-sector public entities and operators, connecting to the basic-services objective at a general level without evidencing a specific result."
+OE,BO-T1447,OE1,Capacidades gubernamentales en agenda de genero y diversidad,SO1,YES,Mejor focalización de las políticas sociales,,,"Bajo el objetivo de politicas sociales, el OE actua sobre inclusion social al fortalecer la agenda de genero y diversidad; el RE mas cercano es 'Crear y fortalecer sistema de protección social', pero el OE no crea ni fortalece especificamente dicho sistema."
+OP,BO-T1447,,,,YES,Mejor focalización de las políticas sociales,,,"La operación se vincula a la mejora de las políticas sociales a nivel de objetivo al fortalecer capacidades para la agenda de género y diversidad, sin evidenciar un resultado específico."
+OE,BO-T1451,OE1,Fortalecimiento del Viceministerio de Ciencia y Tecnologia para I+D+i y transferencia,SO1,YES,Mejora de la infraestructura productiva y la tecnología,,,"El Viceministerio de Ciencia y Tecnología es una entidad pública del sector de ciencia, tecnología e innovación y actúa sobre tecnología productiva bajo el objetivo de infraestructura productiva y tecnología; el RE más cercano es 'Incrementar la inversión productiva', que no es evidenciado directamente por este OE."
+OP,BO-T1451,,,,YES,Mejora de la infraestructura productiva y la tecnología,,,"La CT fortalece al Viceministerio de Ciencia y Tecnología para promover CTI, lo que actúa sobre la tecnología productiva sin evidenciar un resultado específico medido en la estrategia."
+OE,BO-T1452,OE1,Eficacia del Catastro Ambiental Rural (CAR),SO1,YES,Fortalecer y modernizar la gestión del sector público.,,,"Bajo el objetivo de gestión del sector público, el CAR es un catastro público y la CT informa su diseño e implementación, pero no alcanza el RE más cercano de 'Mejorar la simplificación administrativa y la digitalización.', por lo que procede un alineamiento a nivel de objetivo."
+OP,BO-T1452,,,,YES,Fortalecer y modernizar la gestión del sector público.,,,"La operación se vincula a nivel de objetivo con la gestión pública al generar evidencia para el diseño e implementación del CAR, sin evidenciar un resultado específico."
+OE,BO-T1454,OE1,Uso de herramienta digital 'Energizados' en ENDE,ER1,YES,Mejorar la simplificación administrativa y la digitalización.,,,"Bajo el objetivo de gestión del sector público, la OE implementa una herramienta digital/información en una entidad pública de electricidad (ENDE) para detectar pérdidas y fraudes, evidenciando digitalización."
+OE,BO-T1454,OE1,Uso de herramienta digital 'Energizados' en ENDE,SO2,YES,Mejorar la prestación de servicios básicos.,,,"Actúa sobre la distribución eléctrica para mejorar calidad del servicio y reducir pérdidas, por lo que el objetivo más cercano es el de servicios básicos; el RE más próximo es 'Mejora de la calidad y el acceso a la electricidad en zonas rurales', pero la OE no apunta específicamente a áreas rurales ni al acceso."
+OP,BO-T1454,,,,YES,Mejorar la simplificación administrativa y la digitalización.,,,La CT se conecta a este resultado mediante la implementación de una herramienta digital en una entidad pública de electricidad.
+OP,BO-T1454,,,,YES,Mejorar la prestación de servicios básicos.,,,"La CT actúa sobre la calidad del servicio y la reducción de pérdidas en la distribución eléctrica, conectando a nivel de objetivo sin evidenciar un RE específico."
+OE,BO-T1456,OE1,Action Plan C&D,,NO,None,,,"The general objective 'Action Plan C&D' does not identify any sector, service, or population and thus does not evidence any specific result or objective in the strategy."
+OP,BO-T1456,,,,NO,None,,,No specific objective connects to any result or strategic objective based on the generic operation objective provided.
+OE,BO-T1457,OE1,Fortalecimiento de la política y la gestión fiscal,ER1,YES,Mayor eficiencia del sector público,,,"Bajo el objetivo Promover la sostenibilidad fiscal, el OE fortalece la política y la gestión fiscal mediante apoyo al MEFP, lo que incide en la eficiencia del sector público."
+OE,BO-T1457,OE1,Fortalecimiento de la política y la gestión fiscal,ER2,YES,Contribuir consolidación fiscal,,,"Bajo el objetivo Promover la sostenibilidad fiscal, el OE aborda temas macrofiscales y de gestión del gasto público que contribuyen a la consolidación fiscal."
+OP,BO-T1457,,,,YES,Mayor eficiencia del sector público,,,La CT conecta a este resultado mediante el fortalecimiento de la política y la gestión fiscal del MEFP.
+OP,BO-T1457,,,,YES,Contribuir consolidación fiscal,,,La CT conecta a este resultado al apoyar temas macrofiscales y de gestión del gasto público en el MEFP.
+OE,BO-T1459,OE1,Estudios para mejorar la planificación urbana en municipios amazónicos,SO1,YES,Mejorar la prestación de servicios básicos.,,,"Under the basic services objective, the OE acts upon urban infrastructure through planning studies but falls short of evidencing the nearest result 'Acceso a la infraestructura urbana.' because it prepares plans rather than delivering access or works."
+OP,BO-T1459,,,,YES,Mejorar la prestación de servicios básicos.,,,The operation connects generally to the basic services objective via urban planning studies without evidencing a specific result on urban access.
+OE,BO-T1461,OE1,Apoyo a MDPyA en inversión pública agropecuaria,ER1,YES,Incrementar la inversión productiva.,,,"Bajo el objetivo de infraestructura productiva y tecnología (SO 4), las palabras 'preparación y supervisión de proyectos de inversión pública en ... infraestructura productiva agropecuaria' indican contribución a inversión productiva, y la división PTI/ARD confirma el enfoque agroproductivo."
+OE,BO-T1461,OE1,Apoyo a MDPyA en inversión pública agropecuaria,SO1,YES,Fortalecer y modernizar la gestión del sector público.,,,"Actúa sobre la gestión pública del ministerio (SO 2) al 'apoyar ... en la preparación y supervisión de proyectos de inversión pública'; el RE más cercano es 'Mejorar la simplificación administrativa y la digitalización.' pero el objetivo no menciona simplificación ni digitalización, y la división PTI/ARD sustenta el ámbito público-agropecuario."
+OP,BO-T1461,,,,YES,Incrementar la inversión productiva.,,,"El objetivo general apunta a proyectos de inversión pública en infraestructura productiva agropecuaria, lo que conecta débilmente con este resultado."
+OP,BO-T1461,,,,YES,Fortalecer y modernizar la gestión del sector público.,,,"El objetivo general fortalece la gestión del ministerio en preparación y supervisión de inversiones públicas, alineando a nivel de objetivo con SO 2."
+OE,BO-T1462,OE1,Mejora del desempeño de EPSAs,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,,,"Bajo el objetivo 'Mejorar la prestación de servicios básicos', el OE busca mejorar la calidad y sostenibilidad de los servicios de agua y saneamiento fortaleciendo a las EPSAs, que son entidades públicas del sector."
+OP,BO-T1462,,,,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,,,"La CT se conecta a este resultado al fortalecer a las EPSAs para mejorar la calidad y sostenibilidad de los servicios de agua y saneamiento, dentro del objetivo de servicios básicos."
+OE,BO-T1463,OE1,Fortalecimiento de la Atencion Primaria en redes de salud priorizadas,ER1,YES,Mejora de la calidad y el acceso a los servicios de salud,,,"Under the objective 'Mejorar la prestación de servicios básicos', strengthening primary health care in prioritized health networks directly supports improving the quality and access to health services."
+OP,BO-T1463,,,,YES,Mejora de la calidad y el acceso a los servicios de salud,,,The operation connects to the health-services result by strengthening primary care in prioritized health networks.
+OE,BO-T1465,OE1,Fortalecimiento de MHE y ENDE para transmision y mercado electrico,SO1,YES,Mejorar la prestación de servicios básicos.,,,"Bajo el objetivo de servicios básicos: el OE actúa sobre la prestación del servicio eléctrico al fortalecer el SIN y el mercado, siendo el RE más cercano 'Mejora de la calidad y el acceso a la electricidad en zonas rurales', pero el OE no se enfoca específicamente en zonas rurales."
+OP,BO-T1465,,,,YES,Mejorar la prestación de servicios básicos.,,,"La CT actúa sobre la prestación del servicio eléctrico mediante el fortalecimiento del SIN y del mercado, aunque no evidencia un resultado específico de zonas rurales."
+OE,BO-T1466,OE1,Politicas para mercado de capitales e instrumentos financieros sostenibles,ER1,YES,Mayor acceso a la financiación para el sector privado.,,,"Bajo el objetivo Mejora de la infraestructura productiva y la tecnología, este OE impulsa el mercado de capitales y desarrolla instrumentos financieros, lo que habilita mayor acceso a financiamiento del sector privado."
+OE,BO-T1466,OE2,"Fortalecimiento de autoridades financieras para estabilidad, protección e inclusión",ER1,YES,Mayor acceso a la financiación para el sector privado.,,,"Bajo el objetivo Mejora de la infraestructura productiva y la tecnología, el fortalecimiento de autoridades financieras para estabilidad, protección del consumidor y eficiencia apoya la profundización del sistema y el acceso del sector privado al financiamiento."
+OP,BO-T1466,,,,YES,Mayor acceso a la financiación para el sector privado.,,,"La CT apoya políticas e instituciones para profundizar los mercados financieros bajo el objetivo de infraestructura productiva y tecnología, facilitando el acceso del sector privado a la financiación."
+OE,BO-T1467,OE1,Institutional capacity for wildfire risk management via digital tech,ER1,YES,Mejorar la simplificación administrativa y la digitalización.,,,"Bajo el objetivo 'Fortalecer y modernizar la gestión del sector público', este OE digitaliza procesos de gestión de incendios en agencias públicas mediante adopción de un sistema de IA, avanzando la digitalización administrativa."
+OE,BO-T1467,OE2,Accuracy and timeliness of forest fire prediction,ER1,YES,Mejorar la simplificación administrativa y la digitalización.,,,"Bajo el objetivo 'Fortalecer y modernizar la gestión del sector público', este OE mejora la predicción con un sistema de IA implementado, lo que constituye digitalización de funciones públicas relevantes."
+OP,BO-T1467,,,,YES,Mejorar la simplificación administrativa y la digitalización.,,,Ambos OE contribuyen a la digitalización de la gestión pública al implementar y usar sistemas de IA en la gestión de incendios.
+OE,BO-T1468,OE1,Evidencia sobre practicas comerciales sostenibles de MIPYMES,SO1,YES,Mejora de la infraestructura productiva y la tecnología,,,"Bajo el objetivo de productividad y tecnología, el RE más cercano es 'Incrementar la inversión productiva', pero la OE se limita a generar evidencia sobre prácticas sostenibles y sus efectos en ingresos, crédito y acceso a mercados, sin intervenir para aumentar inversión o financiamiento."
+OP,BO-T1468,,,,YES,Mejora de la infraestructura productiva y la tecnología,,,"La operación se conecta de forma general al objetivo de productividad y tecnología al producir evidencia sobre prácticas sostenibles en MIPYMES, sin evidenciar un resultado específico."
+OE,BO-T1471,OE1,Gobernanza rural WASH fortalecida,ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,,,"Bajo el objetivo de mejorar la prestación de servicios básicos, el OE fortalece la gobernanza e instrumentos del WASH rural para mejorar la sostenibilidad, lo que aporta a la calidad y acceso de agua y saneamiento pero no garantiza por sí solo la expansión de cobertura."
+OP,BO-T1471,,,,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,,,La operación se conecta débilmente a este resultado mediante el fortalecimiento de la gobernanza y capacidades del WASH rural orientadas a la sostenibilidad.
+OE,BO-T1472,OE1,Iniciativas basadas en evidencia para mejorar y nivelar aprendizajes,SO1,YES,Fortalecer y modernizar la gestión del sector público.,,,"Bajo el objetivo de gestión del sector público, el apoyo a la generación y uso de evidencia en el Ministerio de Educación (entidad pública) actúa sobre la gestión, pero no alcanza la RE de simplificación administrativa y digitalización al centrarse en iniciativas pedagógicas basadas en evidencia."
+OE,BO-T1472,OE2,Eficiencia en el uso de recursos educativos,ER1,YES,Mayor eficiencia del sector público,,,"Bajo el objetivo de sostenibilidad fiscal, el énfasis en 'fortalecer la eficiencia en el uso de los recursos educativos' contribuye directamente a mayor eficiencia del sector público."
+OP,BO-T1472,,,,YES,Mayor eficiencia del sector público,,,La operación conecta con este resultado mediante el OE que busca eficiencia en el uso de recursos educativos.
+OP,BO-T1472,,,,YES,Fortalecer y modernizar la gestión del sector público.,,,"La operación se vincula a este objetivo por el OE sobre generación y uso de evidencia en un ministerio, aunque no aborda la RE específica de simplificación y digitalización."
+OE,BO-T1473,OE1,Action Plan C&D,,NO,None,,,"The general objective 'Action Plan C&D' identifies no sector, service or population and division CAN/CBO does not disambiguate the sector, so no result or objective can be established."
+OP,BO-T1473,,,,NO,None,,,Only the general objective was available and it does not identify what the operation acts upon.
+OE,BO-T1474,OE1,Capacidad para disenar paquetes de beneficios en salud,ER1,YES,Mejora de la calidad y el acceso a los servicios de salud,,,"Bajo el objetivo SO 6 de servicios basicos, la OE fortalece la capacidad del Ministerio de Salud y Deportes (entidad publica) para disenar paquetes de beneficios en salud, lo que respalda la mejora de la calidad y el acceso a los servicios de salud."
+OE,BO-T1474,OE1,Capacidad para disenar paquetes de beneficios en salud,ER2,YES,Mayor eficiencia del sector público,,,"Bajo el objetivo SO 1 de sostenibilidad fiscal, el objetivo general de 'mejorar la eficiencia en el sector salud' mediante mejores decisiones de gasto contribuye a una mayor eficiencia del sector publico."
+OP,BO-T1474,,,,YES,Mejora de la calidad y el acceso a los servicios de salud,,,La operacion se vincula a este resultado al fortalecer la capacidad para disenar paquetes de beneficios en salud dentro del sector salud.
+OP,BO-T1474,,,,YES,Mayor eficiencia del sector público,,,La operacion contribuye a la eficiencia del sector publico al orientar la toma de decisiones de gasto en salud hacia una mayor eficiencia.
+OE,BO-T1476,OE1,Capacidades para la descentralización del sistema de salud,ER1,YES,Mejora de la calidad y el acceso a los servicios de salud,,,"Bajo el objetivo SO 6 de mejorar la prestación de servicios básicos (salud), el OE fortalece la gestión de la descentralización del sistema de salud orientada a mejorar la calidad y el acceso a los servicios de salud."
+OE,BO-T1476,OE1,Capacidades para la descentralización del sistema de salud,ER2,YES,Mejorar la simplificación administrativa y la digitalización.,,,"Bajo el objetivo SO 2 de gestión del sector público, el OE contempla herramientas de información, seguimiento y rendición de cuentas que evidencian digitalización administrativa."
+OP,BO-T1476,,,,YES,Mejora de la calidad y el acceso a los servicios de salud,,,"La CT fortalece la gestión de la descentralización del sistema de salud, conectando con la mejora de la calidad y el acceso a los servicios de salud."
+OP,BO-T1476,,,,YES,Mejorar la simplificación administrativa y la digitalización.,,,"La CT incorpora herramientas de información y seguimiento, conectando con la simplificación administrativa y la digitalización del sector público."
+OE,BO-T1477,OE1,Fortalecimiento de la protección social,ER1,YES,Crear y fortalecer sistema de protección social,,,"Bajo el objetivo social (SO 5), las palabras 'Fortalecer la protección social' y el diseño de un 'Registro Social' evidencian este resultado, y la división SCL/SPL confirma el sector."
+OP,BO-T1477,,,,YES,Crear y fortalecer sistema de protección social,,,La operación se conecta a este resultado al plantear 'Fortalecer la protección social' y avanzar en un 'Registro Social' bajo el objetivo social.
+OE,BO-T1478,OE1,Fortalecer política y gestión fiscal (MEFP),ER1,YES,Contribuir consolidación fiscal,,,"Under the fiscal sustainability objective, the words 'fortalecer la política y la gestión fiscal' and division IFD/FMM indicate a link to fiscal consolidation via support to the finance ministry."
+OP,BO-T1478,,,,YES,Contribuir consolidación fiscal,,,"The general objective names 'fortalecer la política y la gestión fiscal', aligning with the fiscal sustainability objective's consolidation result."
+OE,BO-T1479,OE1,Empleo formal: analisis de politicas,,NO,None,,,"La frase del objetivo general 'analizar opciones de política para promover la generación de oportunidades de empleo formal' orienta al ámbito laboral (prior coherente con la division SCL/SPL), pero la estrategia no incluye resultados ni un objetivo sectorial de empleo a los que pueda vincularse."
+OP,BO-T1479,,,,NO,None,,,"El objetivo general apunta al empleo formal, pero no hay resultados u objetivos estratégicos en la lista que correspondan al ámbito laboral."
+OE,BO-T1481,OE1,Pre-investment studies for transport projects,ER1,YES,Incrementar la inversión productiva.,,,"Bajo el objetivo 'Mejora de la infraestructura productiva y la tecnología', la preparación de estudios de preinversión y el impulso de esquemas de financiamiento para proyectos de transporte apoya el aumento de la inversión productiva."
+OE,BO-T1481,OE1,Pre-investment studies for transport projects,SO1,YES,Fortalecer y modernizar la gestión del sector público.,,,"El fortalecimiento del marco normativo e institucional actúa sobre la gestión pública; el RE más cercano es 'Mejorar la simplificación administrativa y la digitalización.', pero el OE no explicita simplificación ni digitalización."
+OP,BO-T1481,,,,YES,Incrementar la inversión productiva.,,,La cooperación técnica se vincula a este resultado mediante estudios de preinversión y esquemas de financiamiento para proyectos de transporte.
+OP,BO-T1481,,,,YES,Fortalecer y modernizar la gestión del sector público.,,,"La operación actúa sobre la modernización normativa e institucional del sector, sin evidenciar un resultado específico bajo este objetivo."
+OE,BO-T1483,OE1,"Sostenibilidad de inversiones y O&M en agua, saneamiento y residuos solidos",ER1,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,,,"Under the basic services objective, division INE/WSA and the words 'agua, saneamiento y gestión de residuos sólidos' and 'fortalecer... operación y mantenimiento de los sistemas' evidence a direct focus on improving quality and access to water and sanitation services."
+OP,BO-T1483,,,,YES,Mejora de la calidad y el acceso a servicios de agua y saneamiento,,,"The general objective targets 'agua, saneamiento y gestión de residuos sólidos' and 'operación y mantenimiento de los sistemas', aligning with the basic services objective on improving quality and access to water and sanitation services."
+OE,BO-T1484,OE1,Fortalecimiento de capacidades públicas para inversión,ER1,YES,Mejorar la simplificación administrativa y la digitalización.,,,"Under the objective Fortalecer y modernizar la gestión del sector público, the general objective names 'Desregulación' and 'Transformación Digital', which relate directly to simplification and digitalization, and division IFD/ICS supports this sector focus."
+OE,BO-T1484,OE1,Fortalecimiento de capacidades públicas para inversión,ER2,YES,Mayor eficiencia del sector público,,,"Under the objective Promover la sostenibilidad fiscal, strengthening 'capacidades públicas' and advancing 'Coordinación y Planificación' can improve public-sector efficiency, consistent with division IFD/ICS."
+OE,BO-T1484,OE1,Fortalecimiento de capacidades públicas para inversión,ER3,YES,Un marco normativo y regulatorio fortalecido para la inversión privada.,,,"Under the objective Mayor integración comercial, the intent to 'facilitar la inversión privada' through 'Desregulación' points to strengthening the regulatory framework for private investment, aligned with division IFD/ICS."
+OP,BO-T1484,,,,YES,Mejorar la simplificación administrativa y la digitalización.,,,"The general objective cites 'Desregulación' and 'Transformación Digital', which connect to administrative simplification and digitalization."
+OP,BO-T1484,,,,YES,Mayor eficiencia del sector público,,,The general objective's focus on strengthening 'capacidades públicas' and 'Coordinación y Planificación' relates to improving public-sector efficiency.
+OP,BO-T1484,,,,YES,Un marco normativo y regulatorio fortalecido para la inversión privada.,,,The general objective to 'facilitar la inversión privada' via 'Desregulación' aligns with strengthening the regulatory framework for private investment.
+OE,BO-T1487,OE1,Plan Nacional de Infraestructura Digital y fortalecimiento institucional,ER1,YES,Mejorar la simplificación administrativa y la digitalización.,,,"Under the public-sector management objective, the words 'fortalecer las capacidades institucionales... para apoyar el diseño de un Plan Nacional de Desarrollo de Infraestructura Digital' evidence support to digitalization and administrative improvement in government planning and governance."
+OP,BO-T1487,,,,YES,Mejorar la simplificación administrativa y la digitalización.,,,"The operation’s general objective references 'fortalecer las capacidades institucionales... para apoyar el diseño de un Plan Nacional de Desarrollo de Infraestructura Digital', aligning with public-sector digitalization."
+OE,BO-T1488,OE1,Reformas para facilitar inversion y comercio,ER1,YES,Marco normativo y regulatorio fortalecido para facilitar el comercio exterior.,,,"Bajo el objetivo de 'Mayor integración comercial', el OE apoya reformas y programas para facilitar el comercio exterior, fortaleciendo el marco normativo y regulatorio."
+OE,BO-T1488,OE1,Reformas para facilitar inversion y comercio,ER2,YES,Un marco normativo y regulatorio fortalecido para la inversión privada.,,,"Bajo el objetivo de 'Mayor integración comercial', el OE busca consolidar un marco que facilite la inversión privada mediante reformas y programas."
+OP,BO-T1488,,,,YES,Marco normativo y regulatorio fortalecido para facilitar el comercio exterior.,,,"La CT diseña acciones para facilitar el comercio exterior, lo que fortalece el marco normativo y regulatorio correspondiente a ese objetivo."
+OP,BO-T1488,,,,YES,Un marco normativo y regulatorio fortalecido para la inversión privada.,,,"La CT apoya el diseño de reformas para facilitar la inversión privada, alineándose con el fortalecimiento del marco regulatorio de ese objetivo."
+OE,BO-T1489,OE1,Asistencia humanitaria por emergencias de inundaciones,SO1,YES,Mejor focalización de las políticas sociales,,,"Bajo el objetivo de políticas sociales, el RE más cercano es 'Crear y fortalecer sistema de protección social', pero la asistencia humanitaria temporal no crea ni fortalece un sistema, por lo que no evidencia un resultado específico."
+OP,BO-T1489,,,,YES,Mejor focalización de las políticas sociales,,,"La operación actúa sobre la protección social mediante asistencia humanitaria, sin evidenciar un resultado específico bajo ese objetivo."
+OE,BO-T1490,OE1,Estrategia nacional de logistica y facilitacion del comercio,ER1,YES,Marco normativo y regulatorio fortalecido para facilitar el comercio exterior.,,,"Bajo el objetivo de integracion comercial, las palabras 'estrategia nacional de logistica y competitividad comercial' y 'facilitacion del comercio' evidencian el fortalecimiento del marco para facilitar el comercio exterior."
+OP,BO-T1490,,,,YES,Marco normativo y regulatorio fortalecido para facilitar el comercio exterior.,,,La operacion se orienta a la integracion comercial mediante una estrategia y mecanismos de facilitacion del comercio que fortalecen el marco regulatorio.
+OE,BO-T1491,OE1,Fortalecimiento del SIGED en el Ministerio de Educación,ER1,YES,Mejorar la simplificación administrativa y la digitalización.,,,"Bajo el objetivo de Fortalecer y modernizar la gestión del sector público, la TC busca 'fortalecer el Sistema de Información y Gestión Educativa (SIGED)', lo que evidencia procesos de digitalización en una entidad pública (SCL/EDU)."
+OE,BO-T1491,OE1,Fortalecimiento del SIGED en el Ministerio de Educación,ER2,YES,Mayor eficiencia del sector público,,,"Bajo el objetivo de Promover la sostenibilidad fiscal, la frase 'contribuyendo a una gestión más eficiente de los recursos educativos' apunta a mejoras de eficiencia en el sector público educativo."
+OP,BO-T1491,,,,YES,Mejorar la simplificación administrativa y la digitalización.,,,"La cooperación técnica alude a 'fortalecer el Sistema de Información y Gestión Educativa (SIGED)', lo que se alinea con digitalización en la gestión pública."
+OP,BO-T1491,,,,YES,Mayor eficiencia del sector público,,,La formulación 'contribuyendo a una gestión más eficiente de los recursos educativos' conecta con la eficiencia del sector público.
+OE,BO-T1492,OE1,Evidencia sobre retroalimentacion pedagogica IA,,NO,None,,,"Las palabras 'retroalimentacion pedagogica basada en IA' y 'mejorar la calidad instruccional de los tutores' señalan educacion (division SCL/EDU), pero ningun RE u objetivo listado cubre educacion, por lo que no hay alineacion evidenciable."
+OP,BO-T1492,,,,NO,None,,,"No se evidencian resultados ni objetivos porque el objetivo general se refiere a educacion, ausente en los resultados esperados disponibles."
+OE,BO-T1493,OE1,Evidencia sobre salud materna y neonatal,ER1,YES,Mejora de la calidad y el acceso a los servicios de salud,,,"Bajo el objetivo de servicios básicos (SO 6), las frases 'salud materna y neonatal' y 'utilización de servicios maternos' indican que la TC actúa sobre la calidad y el acceso a servicios de salud, coherente con la división SCL/HNP."
+OP,BO-T1493,,,,YES,Mejora de la calidad y el acceso a los servicios de salud,,,"La operación se conecta a este resultado al generar evidencia sobre 'salud materna y neonatal' y uso de servicios para informar su escalamiento."
+</script>
+<script type="text/plain" id="resumen-src">
+RESUMEN EJECUTIVO
+Bolivia · Estrategia de País 2026-2030
+
+
+ALINEACIÓN A LA ESTRATEGIA
+
+Los 6 Objetivos Estratégicos de la EBP:
+- Todos tienen operaciones alineadas.
+- 3 tienen al menos una operación con alineación fuerte.
+- 3 solo cuentan con operaciones alineadas de forma débil: “Promover la sostenibilidad fiscal”, “Fortalecer y modernizar la gestión del sector público.” y “Mayor integración comercial”.
+
+Los 12 Resultados Esperados de la EBP:
+- Todos tienen operaciones alineadas.
+- 6 tienen al menos una operación con alineación fuerte.
+- 5 solo cuentan con operaciones alineadas de forma débil: “Mayor eficiencia del sector público”, “Contribuir consolidación fiscal”, “Mejorar la simplificación administrativa y la digitalización.”, “Un marco normativo y regulatorio fortalecido para la inversión privada.” y “Incrementar la inversión productiva.”.
+- El resultado esperado “Marco normativo y regulatorio fortalecido para facilitar el comercio exterior.” recibe apoyo únicamente de cooperaciones técnicas, que no tienen grado de alineación.
+
+
+LA CARTERA
+
+De un total de 93 operaciones activas desde la aprobación de la EBP vigente (préstamos, garantías, investment grants y cooperaciones técnicas), 32 son préstamos y garantías y 61 son cooperaciones técnicas.
+
+Préstamos y garantías: de las 32 del universo, 32 (100%) presentan al menos una alineación con la EBP. Se identificaron 51 alineaciones, 17 fuertes y 34 débiles. De ellas, 46 se vinculan con un resultado esperado de la EBP y 34 con un objetivo estratégico.
+
+Cooperaciones técnicas: de las 61 del universo, 56 (92%) presentan al menos una alineación con la EBP. Se identificaron 77 alineaciones, que no tienen grado de alineación. De ellas, 60 se vinculan con un resultado esperado de la EBP y 29 con un objetivo estratégico.
+
+Cinco operaciones fueron analizadas sin encontrar relación con la EBP: BO-T1385, BO-T1456, BO-T1473, BO-T1479, BO-T1492.
+
+
+CONCENTRACIÓN
+
+La mitad de las operaciones alineadas se concentra en cuatro de los 12 resultados esperados de la EBP con cobertura. Los cinco con mayor número de operaciones son: “Mejorar la simplificación administrativa y la digitalización.” (16 operaciones), “Mejora de la calidad y el acceso a servicios de agua y saneamiento” (14), “Mayor eficiencia del sector público” (10), “Mejora de la calidad y el acceso a los servicios de salud” (9), “Contribuir consolidación fiscal” (8).
+</script>
+<script type="text/plain" id="colores-src">@@COLORES@@</script>
+<script type="text/plain" id="lang-src">Español</script>
+
+<div class="tab-content" id="tab-resumenejec">
+  <div class="tab-intro" data-i18n="intro_resumenejec">Resumen ejecutivo de la alineación cartera–estrategia (generado en el flujo).</div>
+  <div id="resumen-ejec-cont" style="margin:8px 36px 24px;max-width:var(--viz-max);white-space:pre-wrap;line-height:1.6;font-size:13.5px;color:var(--ink);"></div>
+</div>
+
+<script>
+/* ============================================================
+   PARTE 1 — ESTRUCTURA DE LA ESTRATEGIA (fija para DR).
+   Jerarquía: Pilar (área estratégica) › Objetivo Estratégico › ER.
+   Si algún día cambia la estrategia del país, se edita acá.
+   ============================================================ */
+/* ============================================================
+   PARTE 1 — ESTRUCTURA DE LA ESTRATEGIA DEL PAÍS
+   Jerarquía: Pilar (área estratégica) › Objetivo Estratégico › ER.
+
+   ⚠️ AL CAMBIAR DE PAÍS, LEER ESTO:
+   1. Copiá el texto de cada ER EXACTAMENTE como se le pasa al agente
+      de clasificación: mismo IDIOMA y misma REDACCIÓN que ve el agente.
+      NO transcribas desde una matriz traducida (p. ej. una imagen en
+      inglés) si el agente trabaja en español: ese fue el origen de que
+      cambiaran nombres y no coincidieran los resultados.
+   2. El texto de cada ER debe coincidir con la columna related_er del
+      output del agente. La normalización de más abajo ya tolera las
+      diferencias de FORMATO (punto final, espacios, mayúsculas, acentos),
+      así que no hace falta que sea idéntico carácter a carácter.
+   3. Si el agente además REFORMULA un ER (redacción distinta, no solo
+      formato), agregá esa variante en ER_ALIASES. El panel de
+      diagnóstico (arriba de las pestañas) te dice cuáles hace falta.
+   ============================================================ */
+let STRATEGY = [
+  { pilar:"NOMBRE DEL ÁREA / PILAR 1", objetivos:[
+    { obj:"Nombre del objetivo estratégico", ers:[
+      "Texto exacto del Resultado Esperado (ER), tal como lo ve el agente",
+      "Texto exacto de otro ER",
+    ]},
+    { obj:"Otro objetivo estratégico", ers:[
+      "Texto exacto del ER",
+    ]},
+  ]},
+  { pilar:"NOMBRE DEL ÁREA / PILAR 2", objetivos:[
+    { obj:"Nombre del objetivo estratégico", ers:[
+      "Texto exacto del ER",
+    ]},
+  ]},
+  // ... un bloque { pilar... } por cada área estratégica ...
+];
+
+/* ============================================================
+   NORMALIZACIÓN DE ER — capa fija, agnóstica de país e idioma.
+   Hace robusta la vinculación entre el related_er del agente y el ER
+   canónico de la estrategia: ignora punto final, espacios, mayúsculas
+   y acentos. NO tocar al cambiar de país.
+   ============================================================ */
+/* Parte un texto en hasta maxLines líneas de ~maxChars caracteres, cortando por palabra.
+   Si aún excede, trunca la última línea con "…". Devuelve array de líneas. */
+function wrapLabel(text, maxChars, maxLines){
+  maxChars=maxChars||46; maxLines=maxLines||2;
+  const words=String(text||"").replace(/\s+/g," ").trim().split(" ");
+  const out=[]; let line="";
+  for(let i=0;i<words.length;i++){
+    const w=words[i];
+    const t=line?line+" "+w:w;
+    if(t.length<=maxChars){ line=t; }
+    else if(out.length<maxLines-1){ if(line)out.push(line); line=w; }
+    else { line=t; }   // en la última línea permitida: seguir para truncar después
+  }
+  if(line) out.push(line);
+  if(out.length>maxLines) out.length=maxLines;
+  // ¿quedó texto sin mostrar? truncar la última línea
+  const lastIdx=out.length-1;
+  if(out[lastIdx] && out[lastIdx].length>maxChars){
+    let s=out[lastIdx].slice(0,maxChars-1);
+    s=s.replace(/\s+\S*$/,"");           // no cortar palabra a la mitad
+    out[lastIdx]=(s||out[lastIdx].slice(0,maxChars-1))+"…";
+  }
+  return out;
+}
+function _normKey(s){
+  return String(s||"")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")   // sin acentos
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g," ")                          // solo alfanumérico
+    .trim();
+}
+/* ER_ALIASES — ESPECÍFICO DE CADA PAÍS. Dejar VACÍO por defecto.
+   Solo se llena cuando el agente REFORMULA un ER (no por diferencias de
+   formato, que ya resuelve _normKey). Formato:
+     "texto de la variante que devuelve el agente": "ER canónico de STRATEGY",
+   El panel de diagnóstico indica qué cadenas agregar acá. */
+const ER_ALIASES = {
+};
+/* SHOW_OBJ_LINKS: true dibuja líneas directas Operación→Objetivo para las filas cuyo
+   related_er es el nombre de un Objetivo (no un RE). false las ignora (versión "solo RE"). */
+let SHOW_OBJ_LINKS = true;
+const OBJ_PREFIX="##OBJ##";   // marca un related_er que en realidad apunta a un Objetivo Estratégico
+let _erCanonIndex=null, _objCanonIndex=null;
+function _buildErCanonIndex(){
+  _erCanonIndex={}; _objCanonIndex={};
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>{
+    _objCanonIndex[_normKey(o.obj)]=o.obj;
+    o.ers.forEach(er=>{ _erCanonIndex[_normKey(er)]=er; });
+  }));
+  Object.keys(ER_ALIASES).forEach(k=>{ _erCanonIndex[_normKey(k)]=ER_ALIASES[k]; });
+}
+function canonicalER(text){
+  const s=String(text==null?"":text).trim();
+  if(s===""||s.toLowerCase()==="none") return "None";
+  if(!_erCanonIndex) _buildErCanonIndex();
+  const k=_normKey(s);
+  if(_erCanonIndex[k]) return _erCanonIndex[k];        // matchea un RE
+  if(_objCanonIndex[k]) return OBJ_PREFIX+_objCanonIndex[k];  // matchea un Objetivo -> línea op→objetivo
+  return s;                                            // sin match -> se mantiene (no coincidente)
+}
+function isObjRef(er){ return typeof er==="string" && er.indexOf(OBJ_PREFIX)===0; }
+function objOf(er){ return isObjRef(er) ? er.slice(OBJ_PREFIX.length) : null; }
+
+/* ============================================================
+   PARTE 2 — DATOS DEL OUTPUT DEL AGENTE (una fila por alineación OE→ER).
+   Reemplazar el contenido de ROWS con el output real.
+     op, op_type("A"/"B"), oe_id, oe(texto), er(related_er / "None"),
+     conn("YES"/"NO"), feas, align("Strong"/"Weak"/"None"), reasoning
+   El texto de "er" debe coincidir con un ER de STRATEGY para conectar.
+   ============================================================ */
+let ROWS = [
+  {op:"XX-L0001", op_type:"A", oe_id:"OE1", oe:"RE de operación de ejemplo (alineación fuerte)", er:"Texto exacto del Resultado Esperado (ER), tal como lo ve el agente", conn:"YES", feas:"High", align:"Strong", reasoning:"Fila de ejemplo — se reemplaza al cargar el CSV real del agente."},
+  {op:"XX-L0001", op_type:"A", oe_id:"OE2", oe:"RE de operación de ejemplo (alineación débil)", er:"Texto exacto de otro ER", conn:"YES", feas:"Low", align:"Weak", reasoning:"Fila de ejemplo."},
+  {op:"XX-T0001", op_type:"B", oe_id:"OE1", oe:"Cooperación técnica de ejemplo", er:"Texto exacto del ER", conn:"YES", feas:"", align:"Weak", reasoning:"Fila de ejemplo."},
+  {op:"XX-L0002", op_type:"A", oe_id:"OE1", oe:"Operación de ejemplo sin alineación", er:"None", conn:"NO", feas:"", align:"None", reasoning:"Fila de ejemplo sin conexión con la estrategia."},
+];
+
+/* Normaliza el ER de cada fila embebida con el mismo criterio que usaba la carga por CSV.
+   Permite pegar el output del agente TAL CUAL en ROWS (sin limpiar punto final, acentos,
+   etc.): la canonicalización y el panel de diagnóstico se resuelven automáticamente. */
+ROWS = ROWS.map(r => Object.assign({}, r, { er: canonicalER(r.er) }));
+
+/* ==== Inyección desde el flujo: si los placeholders fueron reemplazados, usarlos ==== */
+(function(){
+  try{ var se=document.getElementById('estrategia-src'); if(se){ var t=se.textContent.trim();
+    if(t && !(t.charAt(0)==='@'&&t.charAt(1)==='@')){ var st=buildStrategyFromFlat(t); if(st && st.length) STRATEGY=st; } } }catch(e){ console.log('estrategia-src',e); }
+  // La STRATEGY real ya está cargada: invalidar el índice canónico para que se reconstruya con ella
+  // (si no, parseAgentCSV canonizaría contra la estrategia de ejemplo y no detectaría los objetivos).
+  _erCanonIndex=null; _objCanonIndex=null;
+  try{ var de=document.getElementById('datos-src'); if(de){ var t=de.textContent.trim();
+    if(t && !(t.charAt(0)==='@'&&t.charAt(1)==='@')){ var rw=parseAgentCSV(t); if(rw && rw.length) ROWS=rw; } } }catch(e){ console.log('datos-src',e); }
+  // Re-canonizar cualquier ROWS embebido con el índice correcto (por si no vino datos-src)
+  ROWS = ROWS.map(function(r){ return Object.assign({}, r, { er: canonicalER(r.er) }); });
+})();
+
+/* ====== Lógica de render ====== */
+const tip = d3.select("#tip");
+let PIN=false, HOVERON=false;   // clic para fijar lo resaltado
+function _clearAllHighlight(){
+  d3.selectAll("path.link").classed("dim",false).classed("show",false);
+  d3.selectAll(".node-dim").classed("node-dim",false);
+  d3.selectAll("path.shortlink").classed("dim",false);
+}
+function _unpin(){ PIN=false; HOVERON=false; _clearAllHighlight(); tip.style("opacity",0); }
+function _chartClick(){ if(PIN){ _unpin(); } else if(HOVERON){ PIN=true; } }
+function showTip(html,ev){ if(PIN) return; HOVERON=true; tip.html(html).style("opacity",1).style("left",(ev.clientX+14)+"px").style("top",(ev.clientY+14)+"px");}
+function hideTip(){ if(PIN) return; HOVERON=false; tip.style("opacity",0);}
+function curve(x1,y1,x2,y2){const mx=(x1+x2)/2;return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;}
+
+// Índice ER -> {pilar, obj}
+const erIndex = {};
+STRATEGY.forEach(p => p.objetivos.forEach(o => o.ers.forEach(er => { erIndex[er] = {pilar:p.pilar, obj:o.obj}; })));
+
+// Stats
+function computeStats(){
+  const allOps=[...new Set(ROWS.map(r=>r.op))];
+  const opType={}; ROWS.forEach(r=>{ opType[r.op]=r.op_type; });
+  const prestamos = allOps.filter(op=>opType[op]!=="B").length;   // operaciones tipo A (INV + INV GR)
+  const nObjetivos = STRATEGY.reduce((a,p)=>a+p.objetivos.length,0);
+  // ER cubiertos por operación tipo A (cartera activa)
+  const erCubA = new Set(ROWS.filter(r=>r.conn==="YES"&&r.op_type!=="B"&&r.er&&r.er!=="None").map(r=>r.er));
+  // Total de RE de la EBP = pares (objetivo, ER); cubiertos = pares cuyo ER tiene op A alineada
+  let paresEBP=0, paresCub=0;
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>{ paresEBP++; if(erCubA.has(er)) paresCub++; })));
+  document.getElementById("stats").innerHTML=`
+    <div class="stat"><div class="n">${prestamos}</div><div class="l">Préstamos (INV + INV GR)<sup class="ast">*</sup></div></div>
+    <div class="stat"><div class="n">${STRATEGY.length}</div><div class="l">Pilares en EBP</div></div>
+    <div class="stat"><div class="n">${nObjetivos}</div><div class="l">Objetivos estratégicos en EBP</div></div>
+    <div class="stat"><div class="n">${paresEBP}</div><div class="l">Resultados esperados en EBP</div></div>
+    <div class="stat"><div class="n">${paresCub}</div><div class="l">Resultados esperados en EBP cubiertos</div></div>`;
+}
+computeStats();
+
+/* ========================================================================
+   COLORES — Probabilidad de logro (SOLO operaciones tipo A).
+   - OE (RE de operación): color propio (Verde/Amarillo/Rojo) o gris si no hay dato.
+   - Operación (cuadrado): color agregado según reglas sobre sus OE.
+   - RE de estrategia y Objetivo: color CONTINUO = promedio 0–1 de las operaciones
+     tipo A alineadas con probabilidad revisada.
+   - Cooperaciones Técnicas (tipo B): siempre celeste.
+   ======================================================================== */
+let COLOR_OE = {
+  // Vacío = viz SIN colores de probabilidad (se ve como el caso simple).
+  // Para colorear: pegá acá "PROJECT|OEID":"Verde"/"Amarillo"/"Rojo" desde colores_por_oeid.csv
+  // Ej:  "DR-L1150|OE1":"Verde",
+};
+const PROB_HEX={"Verde":"#3fb96b","Amarillo":"#f2c14e","Rojo":"#e0524d","Gris":"#c2cad6"};
+const PROB_VAL={"Verde":1,"Amarillo":0.5,"Rojo":0};   // escala 0–1
+const TC_HEX="#6cb2e4";                                // celeste para CT
+// Operaciones en pipeline: se muestran con borde azul y fondo blanco (no llevan color de probabilidad)
+const PIPELINE_OPS = new Set([  /* agregar aquí los códigos de operaciones en pipeline, ej: "ME-L1350","ME-L1352" */  ]);
+function isPipeline(op){ return PIPELINE_OPS.has(op); }
+let HAS_COLORS=false; let COLOR_OE_BY_OP={};
+function rebuildColors(){
+  COLOR_OE_BY_OP={};
+  Object.keys(COLOR_OE).forEach(k=>{const i=k.indexOf("|");const op=k.slice(0,i),oe=k.slice(i+1);(COLOR_OE_BY_OP[op]=COLOR_OE_BY_OP[op]||{})[oe]=COLOR_OE[k];});
+  HAS_COLORS=Object.keys(COLOR_OE).length>0;
+}
+rebuildColors();
+/* Parser del CSV de colores (project, oe_id, color) -> mapa "project|oe_id":"Color" */
+function csvToColors(text){
+  const parsed=parseCSV(text); if(parsed.length<2) return {};
+  const h=parsed[0].map(x=>x.trim().toLowerCase());
+  const iP=h.indexOf("project"), iO=h.indexOf("oe_id"), iC=h.indexOf("color");
+  const map={}; if(iP<0||iO<0||iC<0) return map;
+  const cap=x=>x?x.charAt(0).toUpperCase()+x.slice(1).toLowerCase():"";
+  for(let k=1;k<parsed.length;k++){ const r=parsed[k];
+    const p=(r[iP]||"").trim(), o=(r[iO]||"").trim(), c=cap((r[iC]||"").trim());
+    if(p&&o&&(c==="Verde"||c==="Amarillo"||c==="Rojo")) map[p+"|"+o]=c;
+  }
+  return map;
+}
+/* Inyección de colores desde el flujo (placeholder @@COLORES@@ reemplazado por Power Automate).
+   Se ejecuta aquí, después de declarar COLOR_OE, csvToColors y rebuildColors,
+   para evitar el error "Cannot access 'COLOR_OE' before initialization". */
+(function(){
+  try{ var ce=document.getElementById('colores-src'); if(ce){ var t=ce.textContent.trim();
+    if(t && !(t.charAt(0)==='@'&&t.charAt(1)==='@')){ var cmap=csvToColors(t); if(cmap && Object.keys(cmap).length){ COLOR_OE=cmap; rebuildColors(); } } } }catch(e){ console.log('colores-src',e); }
+})();
+/* Muestra/oculta la leyenda de probabilidad según HAS_COLORS y la pestaña activa. */
+function applyLegend(){
+  var lg=document.getElementById("legend"), ln=document.getElementById("legend-note");
+  var at=document.querySelector(".tab.active"); var name=at?at.dataset.tab:"A";
+  var show = HAS_COLORS && !(name==="tabla"||name==="resumen"||name==="agregada"||name==="resumenejec");
+  if(lg) lg.style.display=show?"flex":"none";
+  if(ln) ln.style.display=HAS_COLORS?"":"none";
+}
+function oeColorName(op,oe){const c=COLOR_OE[op+"|"+oe];return (c==="Verde"||c==="Amarillo"||c==="Rojo")?c:"Gris";}
+function oeHex(op,oe){return PROB_HEX[oeColorName(op,oe)];}
+function opColorName(op){
+  const m=COLOR_OE_BY_OP[op]||{};
+  const cols=Object.values(m).filter(c=>c==="Verde"||c==="Amarillo"||c==="Rojo");
+  const n=cols.length; if(n===0) return "Gris";
+  const g=cols.filter(c=>c==="Verde").length, y=cols.filter(c=>c==="Amarillo").length, r=cols.filter(c=>c==="Rojo").length;
+  if(r>g && r>y) return "Rojo";              // mayoría roja -> rojo
+  if(g>=y && g>=r && g!==r) return "Verde";  // verde domina (le gana al amarillo en empate); empate verde-rojo NO
+  return "Amarillo";                         // empate verde-rojo, mayoría amarilla, o mezcla -> amarillo
+}
+function opMeanValue(op){
+  const m=COLOR_OE_BY_OP[op]; if(!m) return null;
+  const vals=Object.values(m).map(c=>PROB_VAL[c]).filter(v=>v!=null);
+  return vals.length? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+// Valor de un RE de operación específico (op + oe_id), según su color asignado.
+function oeValue(op,oe){
+  const m=COLOR_OE_BY_OP[op]; if(!m||!oe) return null;
+  const v=PROB_VAL[m[oe]]; return (v==null)?null:v;
+}
+function contHex(v){
+  if(v==null) return "#c2cad6";
+  const st=[[0,[224,82,77]],[0.25,[239,138,77]],[0.5,[242,193,78]],[0.75,[182,200,74]],[1,[63,185,107]]];
+  v=Math.max(0,Math.min(1,v));
+  for(let i=1;i<st.length;i++){ if(v<=st[i][0]){ const a=st[i-1][0],b=st[i][0],ca=st[i-1][1],cb=st[i][1],t=(v-a)/(b-a);
+    const c=ca.map((x,j)=>Math.round(x+(cb[j]-x)*t)); return "rgb("+c[0]+","+c[1]+","+c[2]+")"; } }
+  return "rgb(63,185,107)";
+}
+function inkOn(name,isTC){ if(isTC) return "#ffffff"; return (name==="Amarillo"||name==="Gris")?"#1a2238":"#ffffff"; }
+
+function drawSankeyBase(svgId, rows){
+  const svg=d3.select(svgId); svg.selectAll("*").remove();
+  PIN=false; HOVERON=false; svg.on("click", _chartClick);
+  const isTC = rows.every(r=>r.op_type==="B");
+  if(rows.length===0){ svg.attr("viewBox","0 0 1180 200"); svg.append("text").attr("x",590).attr("y",100).attr("text-anchor","middle").attr("fill","var(--muted)").attr("font-size",15).text("No hay operaciones de este tipo."); return; }
+
+  const ops=(()=>{
+    const arr=[...new Set(rows.map(r=>r.op))];
+    const erIdx={}; let _k=0; STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>{ if(!(er in erIdx)) erIdx[er]=_k++; })));
+    const keyOf=op=>{ let m=Infinity; rows.forEach(r=>{ if(r.op===op&&r.conn==="YES"&&(r.er in erIdx)) m=Math.min(m,erIdx[r.er]); }); return m; };
+    return arr.map(op=>({op,k:keyOf(op)})).sort((a,b)=> (a.k-b.k) || (arr.indexOf(a.op)-arr.indexOf(b.op))).map(x=>x.op);
+  })();
+  // OE alineados (los que tienen al menos una conexión YES) -> círculos
+  const oeAll=[]; rows.forEach(r=>{const k=r.op+"|"+r.oe_id; if(!oeAll.find(o=>o.key===k)) oeAll.push({key:k,op:r.op,oe_id:r.oe_id,oe:r.oe});});
+  const oeConnected = oeAll.filter(o => rows.some(r=>r.op===o.op&&r.oe_id===o.oe_id&&r.conn==="YES"));
+  // Operaciones que no tienen NINGÚN OE alineado -> se muestran solas en gris
+  const opsAlineadas = new Set(oeConnected.map(o=>o.op));
+
+  // ER presentes en los datos (con alineación), ordenados por STRATEGY (pilar/obj)
+  const ersData = new Set(rows.filter(r=>r.conn==="YES"&&r.er&&r.er!=="None").map(r=>r.er));
+  // Estructura visible: TODA la estrategia (pilares/objetivos/ER), marcando cuáles quedaron sin alinear.
+  const erAligned = er => ersData.has(er);
+  const visPilares=[];
+  STRATEGY.forEach(p=>{
+    const objs=[];
+    p.objetivos.forEach(o=>{
+      const ers=o.ers.slice();                    // todos los ER del objetivo
+      const anyAl=ers.some(erAligned);
+      objs.push({obj:o.obj, ers, aligned:anyAl});  // objetivo sin alinear = ningún ER alineado
+    });
+    if(objs.length) visPilares.push({pilar:p.pilar, objetivos:objs});
+  });
+
+  // Layout
+  const rowH=50, padTop=90, padBot=40, gapObj=16, gapPilar=30, pilarLabelH=26, objLabelH=0;
+  const colOps=250, colOE=70, colER=770, colObj=1140;
+  const wOps=150, wER=330, wObj=250, rCircle=13;
+
+  // Y de ER (agrupados por pilar/obj), y posición de objetivos
+  const yER={}; const objBox=[]; const pilarBox=[];
+  let cursor=padTop;
+  visPilares.forEach(p=>{
+    const pTop=cursor;
+    cursor+=pilarLabelH;
+    p.objetivos.forEach(o=>{
+      const oTop=cursor;
+      o.ers.forEach((er,i)=>{ yER[er]=cursor+rowH/2; cursor+=rowH; });
+      const oBot=cursor;
+      objBox.push({obj:o.obj, top:oTop, bot:oBot, yc:(oTop+oBot)/2, pilar:p.pilar, aligned:o.aligned});
+      cursor+=gapObj;
+    });
+    cursor+=gapPilar;
+    pilarBox.push({pilar:p.pilar, top:pTop, bot:cursor-gapPilar});
+  });
+  const erBlockH=cursor;
+
+  // Y de operaciones y OE (columna izquierda): agrupar OE bajo su operación
+  // Cada operación ocupa el alto de sus OE-círculos (o 1 si va sola en gris)
+  const opLayout=[]; let oy=padTop;
+  ops.forEach(op=>{
+    // Todos los RE de la operación (alineados y no). Los no alineados se muestran como círculos desconectados.
+    const oesAll=oeAll.filter(o=>o.op===op && o.oe_id);
+    const alignedSet=new Set(oeConnected.filter(o=>o.op===op).map(o=>o.oe_id));
+    const oes=oesAll.map(o=>({...o, aligned:alignedSet.has(o.oe_id)}))
+                    .sort((a,b)=> (a.aligned===b.aligned?0:(a.aligned?-1:1)) || a.oe_id.localeCompare(b.oe_id,undefined,{numeric:true}));
+    const solaGris = !opsAlineadas.has(op);
+    const n = solaGris ? 1 : oes.length;
+    const blockTop=oy;
+    const circles=[];
+    if(!solaGris){
+      oes.forEach((o,i)=>{ circles.push({...o, y: oy + i*(rCircle*2+6) + rCircle}); });
+      oy += n*(rCircle*2+6) + 18;
+    } else {
+      oy += rowH + 10;
+    }
+    const blockBot=oy;
+    opLayout.push({op, solaGris, circles, yc:(blockTop+blockBot)/2 - (solaGris?0:0)});
+  });
+  const opsBlockH=oy;
+
+  const maxH=Math.max(erBlockH, opsBlockH, padTop) + padBot;
+  svg.attr("viewBox",`0 0 1300 ${maxH}`);
+
+  // Encabezados
+  svg.append("text").attr("class","colhead").attr("x",colOps).attr("y",58).attr("text-anchor","middle").text("Operaciones");
+  if(!isTC){ const chOE=svg.append("text").attr("class","colhead").attr("x",colOE).attr("y",40).attr("text-anchor","middle"); chOE.append("tspan").attr("x",colOE).text("RESULTADO"); chOE.append("tspan").attr("x",colOE).attr("dy",13).text("ESPERADO DE LA"); chOE.append("tspan").attr("x",colOE).attr("dy",13).text("OPERACIÓN"); }
+  svg.append("text").attr("class","colhead").attr("x",colER).attr("y",58).attr("text-anchor","middle").text("Resultado esperado de la estrategia");
+  svg.append("text").attr("class","colhead").attr("x",colObj).attr("y",58).attr("text-anchor","middle").text("Objetivo estratégico");
+
+  // Bandas de pilar (fondo blanco) alrededor de los ER
+  pilarBox.forEach(pb=>{
+    svg.append("rect").attr("x",colER-wER/2-14).attr("y",pb.top-4).attr("width",(colObj+wObj/2)-(colER-wER/2)+28).attr("height",pb.bot-pb.top+8).attr("rx",12).attr("fill","#ffffff").attr("opacity",0.65);
+    svg.append("text").attr("class","pilar-label").attr("x",colER-wER/2-6).attr("y",pb.top+16).attr("fill","var(--accent)").text("PILAR: "+pb.pilar.toUpperCase().slice(0,95));
+  });
+
+  const linkLayer=svg.append("g");
+  const allLinks=[];
+
+  // Links Operación -> ER (una sola línea por operación y ER)
+  opLayout.forEach(ol=>{
+    if(ol.solaGris) return;
+    const ers=[...new Set(rows.filter(r=>r.op===ol.op && r.conn==="YES" && r.er && r.er!=="None" && yER[r.er]!==undefined).map(r=>r.er))];
+    ers.forEach(er=>{
+      const rel=rows.filter(r=>r.op===ol.op && r.er===er && r.conn==="YES");
+      const strong=rel.some(r=>r.align==="Strong");
+      const col=strong?"#1f4f8a":"#7fb2e5";
+      const x1=colOps+wOps/2, y1=ol.yc, x2=colER-wER/2, y2=yER[er];
+      const oeList=rel.map(r=>r.oe_id.replace("OE","RE")).join(", ");
+      const _why=(rel.find(r=>r.align==="Strong")||rel.find(r=>r.reasoning&&r.reasoning.trim())||{}).reasoning||"";
+      const path=linkLayer.append("path").attr("class","link").attr("d",curve(x1,y1,x2,y2))
+        .attr("stroke",col).attr("stroke-width",strong?3:1.6).attr("stroke-dasharray",(!isTC&&!strong)?"4,4":null).attr("opacity",0.78)
+        .attr("data-op",ol.op).attr("data-er",er);
+      path.on("mouseover",ev=>showTip(`<b>${ol.op}</b> → ${er}<br>Alineación: <b>${strong?"Strong":"Weak"}</b>`+(_why?`<br><br><span style='color:#dfe7f2'>${_why}</span>`:""),ev))
+        .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",hideTip);
+      allLinks.push({path,op:ol.op,er});
+    });
+  });
+
+  // Links Operación -> Objetivo (filas cuyo related_er es un Objetivo, no un RE)
+  if(SHOW_OBJ_LINKS){
+    const objYc={}; objBox.forEach(ob=>{ objYc[ob.obj]=ob.yc; });
+    opLayout.forEach(ol=>{
+      if(ol.solaGris) return;
+      const objsDir=[...new Set(rows.filter(r=>r.op===ol.op && r.conn==="YES" && isObjRef(r.er) && objYc[objOf(r.er)]!==undefined).map(r=>objOf(r.er)))];
+      objsDir.forEach(obj=>{
+        const rel=rows.filter(r=>r.op===ol.op && objOf(r.er)===obj && r.conn==="YES");
+        const strong=rel.some(r=>r.align==="Strong");
+        const x1=colOps+wOps/2, y1=ol.yc, xc=colObj-wObj/2-24, x2=colObj-wObj/2, y2=objYc[obj];
+        const d=`M${x1},${y1} C${xc},${y1} ${xc},${y2} ${x2},${y2}`;
+        const oeList=rel.map(r=>r.oe_id.replace("OE","RE")).filter(Boolean).join(", ")||"—";
+        const objCol = strong ? "#1f4f8a" : "#7fb2e5";   // color de alineación; sólida=fuerte, punteada=débil
+        const path=linkLayer.append("path").attr("class","link objlink").attr("d",d)
+          .attr("fill","none").attr("stroke",objCol).attr("stroke-width",strong?1.6:1.2)
+          .attr("stroke-dasharray",strong?null:"4,4")
+          .attr("data-op",ol.op).attr("data-obj",obj);
+        path.on("mouseover",ev=>showTip(`<b>${ol.op}</b> → <i>Objetivo</i>: ${obj}<br>Alineación: <b>${strong?"Strong":"Weak"}</b><br><span style='color:#c8cfdc'>Alineación a nivel de objetivo (sin RE específico)</span><br><span style='color:#c8cfdc'>RE op.: ${oeList}</span>`,ev))
+          .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",hideTip);
+        allLinks.push({path,op:ol.op,er:OBJ_PREFIX+obj,obj:obj,isObj:true});
+      });
+    });
+  }
+
+  // Calificación del RE (I.2): Fuerte si ops fuertes >= ops débiles (empate=Fuerte); si no, Débil.
+  const erRating={};
+  Object.keys(yER).forEach(er=>{
+    const opsER=[...new Set(rows.filter(r=>r.conn==="YES"&&r.er===er&&r.op_type==="A").map(r=>r.op))];
+    let sN=0,wN=0;
+    opsER.forEach(op=>{ (rows.some(r=>r.op===op&&r.er===er&&r.conn==="YES"&&r.align==="Strong")?sN++:wN++); });
+    erRating[er]= opsER.length===0 ? "Sin" : (sN>=wN ? "Fuerte" : "Débil");
+  });
+  // Calificación del objetivo (I.3): Fuerte si al menos un RE del objetivo es Fuerte.
+  const objFuerte={};
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>{ objFuerte[o.obj]=o.ers.some(er=>erRating[er]==="Fuerte"); }));
+  // Links ER -> Objetivo estratégico
+  objBox.forEach(ob=>{
+    STRATEGY.forEach(p=>p.objetivos.forEach(o=>{
+      if(o.obj!==ob.obj) return;
+      o.ers.forEach(er=>{ if(yER[er]===undefined) return;
+        const x1=colER+wER/2, y1=yER[er], x2=colObj-wObj/2, y2=ob.yc;
+        const p=linkLayer.append("path").attr("class","link").attr("d",curve(x1,y1,x2,y2))
+          .attr("stroke","#c59dd4").attr("stroke-width",2).attr("stroke-dasharray",(!isTC&&erRating[er]!=="Fuerte")?"4,4":null).attr("opacity",0.5);
+        allLinks.push({path:p, er:er, obj:ob.obj, isErObj:true});
+      });
+    }));
+  });
+
+  // Nodos: operaciones + círculos OE
+  opLayout.forEach(ol=>{
+    const g=svg.append("g").attr("data-node-op",ol.op);
+    const pipe = isPipeline(ol.op);
+    const opColor = pipe ? "#ffffff" : (ol.solaGris ? "#c9d2de" : "#1f4f8a");
+    g.append("rect").attr("class","node-rect").attr("x",colOps-wOps/2).attr("y",ol.yc-14).attr("width",wOps).attr("height",28).attr("rx",6)
+      .attr("fill",opColor).attr("opacity",pipe?1:(ol.solaGris?0.8:0.92))
+      .attr("stroke", pipe?"#1f4f8a":"none").attr("stroke-width", pipe?1.6:0);
+    g.append("text").attr("class","node-label").attr("x",colOps).attr("y",ol.yc+4).attr("text-anchor","middle").style("fill",pipe?"#1f4f8a":(ol.solaGris?"#1a2238":"#ffffff")).style("font-weight",700).text(ol.op);
+    if(!ol.solaGris) g.style("cursor","pointer")
+      .on("mouseover",ev=>{ hoverByOp(ol.op); })
+      .on("mouseout",()=>clearHover());
+    // círculos OE (los no alineados se dibujan sin línea, como círculos desconectados)
+    if(!isTC) ol.circles.forEach(c=>{
+      const rel=rows.filter(r=>r.op===c.op&&r.oe_id===c.oe_id&&r.conn==="YES");
+      const anyStrong=rel.some(r=>r.align==="Strong");
+      const col=anyStrong?"#1f4f8a":"#7fb2e5";
+      if(c.aligned){
+        // línea corta operación -> círculo
+        svg.append("path").attr("class","link shortlink").attr("data-circle-op",c.op).attr("d",curve(colOE+rCircle, c.y, colOps-wOps/2, ol.yc)).attr("stroke",col).attr("stroke-width",2).attr("stroke-dasharray",anyStrong?null:"4,4").attr("opacity",0.55);
+      }
+      const cg=svg.append("g").attr("data-circle-op",c.op).attr("data-circle-aligned", c.aligned?"1":"0");
+      cg.append("circle").attr("class","node-rect").attr("cx",colOE).attr("cy",c.y).attr("r",rCircle)
+        .attr("fill", c.aligned?col:"#e7e9ee").attr("opacity", c.aligned?0.92:0.9)
+        .attr("stroke", c.aligned?"none":"#9aa7bd").attr("stroke-width",1.2).attr("stroke-dasharray", c.aligned?null:"3,2");
+      cg.append("text").attr("class","oe-circle-label").attr("x",colOE).attr("y",c.y+3).attr("text-anchor","middle").style("fill", c.aligned?null:"#5d6b85").text(c.oe_id.replace("OE","RE"));
+      cg.style("cursor","pointer").on("mouseover",ev=>{ showTip(`<b>${c.op} · ${c.oe_id.replace("OE","RE")}</b><br>${c.oe}`+(c.aligned?"":"<br><span style='color:#f0c060'>RE sin alinear</span>"),ev); hoverByOp(c.op); })
+        .on("mousemove",ev=>showTip(tip.html(),ev))
+        .on("mouseout",()=>{ hideTip(); clearHover(); });
+    });
+  });
+
+  // Nodos ER  (los no alineados: mismo texto, fondo claro y borde punteado)
+  Object.keys(yER).forEach(er=>{
+    const al = ersData.has(er);
+    const g=svg.append("g").attr("data-node-er",er);
+    const _lines=wrapLabel(er,46,2);
+    const _h=_lines.length>1?42:28;
+    g.append("rect").attr("class","node-rect").attr("x",colER-wER/2).attr("y",yER[er]-_h/2).attr("width",wER).attr("height",_h).attr("rx",6)
+      .attr("fill", al?"#c59dd4":"#e7e9ee").attr("opacity", al?0.44:0.9)
+      .attr("stroke","#1f4f8a").attr("stroke-width",1.2).attr("stroke-dasharray", al?null:"4,3").attr("stroke-opacity", al?1:0.55);
+    const _ty=yER[er]-(_lines.length-1)*7+4;
+    _lines.forEach((ln,ix)=>g.append("text").attr("class","node-label").attr("x",colER-wER/2+8).attr("y",_ty+ix*14).text(ln));
+    g.style("cursor","pointer")
+     .on("mouseover",ev=>{ showTip(`<b>${er}</b>`+(al?"":"<br><span style='color:#f0c060'>Sin operaciones alineadas</span>"),ev); hoverByEr(er); })
+     .on("mousemove",ev=>showTip(tip.html(),ev))
+     .on("mouseout",()=>{ hideTip(); clearHover(); });
+  });
+
+  // Nodos Objetivo estratégico
+  const objOpCount={};  // obj -> nº de operaciones alineadas a nivel de objetivo
+  allLinks.forEach(l=>{ if(l.isObj){ (objOpCount[l.obj]=objOpCount[l.obj]||new Set()).add(l.op); } });
+  objBox.forEach(ob=>{
+    const alObj = (ob.aligned!==undefined) ? ob.aligned : true;
+    const g=svg.append("g").attr("data-node-obj",ob.obj);
+    g.append("rect").attr("class","node-rect").attr("x",colObj-wObj/2).attr("y",ob.yc-22).attr("width",wObj).attr("height",44).attr("rx",6)
+      .attr("fill", alObj?"#c4b799":"#e7e9ee").attr("opacity", alObj?0.28:0.9)
+      .attr("stroke", alObj?"none":"#1f4f8a").attr("stroke-width",1.2).attr("stroke-dasharray", alObj?null:"4,3").attr("stroke-opacity", alObj?1:0.55);
+    const label=ob.obj.length>84?ob.obj.slice(0,82)+"…":ob.obj;
+    g.append("text").attr("class","node-label").attr("x",colObj-wObj/2+8).attr("y",ob.yc-2).attr("font-weight",600).attr("fill",alObj?null:"#5d6b85").text(label.slice(0,42));
+    if(label.length>42) g.append("text").attr("class","node-label").attr("x",colObj-wObj/2+8).attr("y",ob.yc+12).attr("font-weight",600).attr("fill",alObj?null:"#5d6b85").text(label.slice(42,84));
+    // Badge "+N": nº de operaciones alineadas a este objetivo a nivel de objetivo (sin RE específico)
+    const nOps = objOpCount[ob.obj] ? objOpCount[ob.obj].size : 0;
+    g.style("cursor","pointer")
+     .on("mouseover",ev=>{ showTip(`<b>Objetivo estratégico:</b><br>${ob.obj}`+(nOps?`<br><span style='color:#c8cfdc'>${nOps} operación(es) alineada(s) a nivel de objetivo</span>`:"")+(alObj?"":"<br><span style='color:#f0c060'>Sin Resultados Esperados alineados</span>"),ev); hoverByObj(ob.obj); })
+     .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",()=>{ hideTip(); clearHover(); });
+    if(nOps>0){
+      const bg=svg.append("g").attr("class","obj-badge").attr("data-badge-obj",ob.obj).style("cursor","pointer");
+      const bx=colObj+wObj/2-13, by=ob.yc-22-2;
+      bg.append("circle").attr("cx",bx).attr("cy",by).attr("r",11);
+      bg.append("text").attr("x",bx).attr("y",by+3.5).attr("text-anchor","middle").text("+"+nOps);
+      bg.on("mouseover",ev=>{ showTip(`<b>+${nOps} operación(es)</b> alineada(s) a este objetivo a nivel de objetivo (sin RE específico). Pasá el mouse para ver cuáles.`,ev); hoverByObj(ob.obj); })
+        .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",()=>{ hideTip(); clearHover(); });
+    }
+  });
+
+  /* ===== Sistema de resaltado (hover) centralizado ===== */
+  function _dimAllExcept(opSet, erSet, objSet){
+    svg.selectAll("[data-node-op]").classed("node-dim", function(){ return !opSet.has(this.getAttribute("data-node-op")); });
+    svg.selectAll("[data-node-er]").classed("node-dim", function(){ return !erSet.has(this.getAttribute("data-node-er")); });
+    svg.selectAll("[data-node-obj]").classed("node-dim", function(){ return !objSet.has(this.getAttribute("data-node-obj")); });
+    // Circulitos RE de la operación: se atenúan si su operación no está activa.
+    svg.selectAll("g[data-circle-op]").classed("node-dim", function(){ return !opSet.has(this.getAttribute("data-circle-op")); });
+    // Líneas cortas op→círculo: igual criterio.
+    svg.selectAll("path.shortlink[data-circle-op]").classed("dim", function(){ return !opSet.has(this.getAttribute("data-circle-op")); });
+  }
+  function hoverByOp(op){ if(PIN) return; HOVERON=true;
+    // Primera pasada: RE y objetivos que toca la operación (por sus líneas op→RE y op→objetivo)
+    const erSet=new Set(), objSet=new Set();
+    allLinks.forEach(l=>{ if((l.isObj||!l.isErObj) && l.op===op){ if(l.isObj) objSet.add(l.obj); else erSet.add(l.er); } });
+    // También los objetivos dueños de los RE que toca la operación (cadena op→RE→objetivo)
+    erSet.forEach(er=>{ if(erIndex[er] && erIndex[er].obj) objSet.add(erIndex[er].obj); });
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isErObj) on = erSet.has(l.er);          // RE→obj: solo las de los RE que toca la op
+      else on = (l.op===op);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", on);
+    });
+    _dimAllExcept(new Set([op]), erSet, objSet);
+  }
+  function hoverByEr(er){ if(PIN) return; HOVERON=true;
+    const opSet=new Set();
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isErObj) on = (l.er===er);              // RE→obj de ESTE er
+      else if(l.isObj) on = false;                 // líneas op→objetivo: no
+      else on = (l.er===er);                       // op→RE de ESTE er
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", false);
+      if(on && !l.isErObj && !l.isObj) opSet.add(l.op);
+    });
+    const owner = erIndex[er] ? erIndex[er].obj : null;
+    _dimAllExcept(opSet, new Set([er]), owner?new Set([owner]):new Set());
+  }
+  function hoverByObj(obj){ if(PIN) return; HOVERON=true;
+    // Resalta TODA la cadena que llega a este objetivo: líneas directas op→objetivo,
+    // y también la cadena op→RE→objetivo de los RE que cuelgan de este objetivo.
+    const opSet=new Set(), erSet=new Set();
+    Object.keys(erIndex).forEach(er=>{ if(erIndex[er] && erIndex[er].obj===obj) erSet.add(er); });
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isObj) on = (l.obj===obj);
+      else if(l.isErObj) on = (l.obj===obj);
+      else on = erSet.has(l.er);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", on);
+      if(on){ if(l.op) opSet.add(l.op); if(l.er && !l.isObj) erSet.add(l.er); }
+    });
+    _dimAllExcept(opSet, erSet, new Set([obj]));
+  }
+  function clearHover(){ if(PIN) return; HOVERON=false;
+    allLinks.forEach(l=>{ l.path.classed("dim",false); if(l.isObj) l.path.classed("show",false); });
+    svg.selectAll(".node-dim").classed("node-dim",false);
+    svg.selectAll("path.shortlink").classed("dim",false);
+  }
+}
+
+/* Despacho: con COLOR_OE cargado usa la versión coloreada; vacío, la simple. */
+function drawSankey(svgId, rows){ return HAS_COLORS ? drawSankeyColor(svgId, rows) : drawSankeyBase(svgId, rows); }
+
+function drawSankeyColor(svgId, rows){
+  const svg=d3.select(svgId); svg.selectAll("*").remove();
+  PIN=false; HOVERON=false; svg.on("click", _chartClick);
+  if(rows.length===0){ svg.attr("viewBox","0 0 1180 200"); svg.append("text").attr("x",590).attr("y",100).attr("text-anchor","middle").attr("fill","var(--muted)").attr("font-size",15).text("No hay operaciones de este tipo."); return; }
+
+  const ops=(()=>{
+    const arr=[...new Set(rows.map(r=>r.op))];
+    const erIdx={}; let _k=0; STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>{ if(!(er in erIdx)) erIdx[er]=_k++; })));
+    const keyOf=op=>{ let m=Infinity; rows.forEach(r=>{ if(r.op===op&&r.conn==="YES"&&(r.er in erIdx)) m=Math.min(m,erIdx[r.er]); }); return m; };
+    return arr.map(op=>({op,k:keyOf(op)})).sort((a,b)=> (a.k-b.k) || (arr.indexOf(a.op)-arr.indexOf(b.op))).map(x=>x.op);
+  })();
+  const isTC = rows.every(r=>r.op_type==="B");   // pestaña de Cooperaciones Técnicas
+  // OE alineados (los que tienen al menos una conexión YES) -> círculos
+  const oeAll=[]; rows.forEach(r=>{const k=r.op+"|"+r.oe_id; if(!oeAll.find(o=>o.key===k)) oeAll.push({key:k,op:r.op,oe_id:r.oe_id,oe:r.oe});});
+  const oeConnected = oeAll.filter(o => rows.some(r=>r.op===o.op&&r.oe_id===o.oe_id&&r.conn==="YES"));
+  // Operaciones que no tienen NINGÚN OE alineado -> se muestran solas en gris
+  const opsAlineadas = new Set(oeConnected.map(o=>o.op));
+
+  // ER presentes en los datos (con alineación), ordenados por STRATEGY (pilar/obj)
+  const ersData = new Set(rows.filter(r=>r.conn==="YES"&&r.er&&r.er!=="None").map(r=>r.er));
+  // Estructura visible: TODA la estrategia (pilares/objetivos/ER), marcando cuáles quedaron sin alinear.
+  const erAligned = er => ersData.has(er);
+  const visPilares=[];
+  STRATEGY.forEach(p=>{
+    const objs=[];
+    p.objetivos.forEach(o=>{
+      const ers=o.ers.slice();                    // todos los ER del objetivo
+      const anyAl=ers.some(erAligned);
+      objs.push({obj:o.obj, ers, aligned:anyAl});  // objetivo sin alinear = ningún ER alineado
+    });
+    if(objs.length) visPilares.push({pilar:p.pilar, objetivos:objs});
+  });
+
+  // Layout
+  const rowH=50, padTop=90, padBot=40, gapObj=16, gapPilar=30, pilarLabelH=26, objLabelH=0;
+  const colOps=250, colOE=70, colER=770, colObj=1140;
+  const wOps=150, wER=330, wObj=250, rCircle=13;
+
+  // Y de ER (agrupados por pilar/obj), y posición de objetivos
+  const yER={}; const objBox=[]; const pilarBox=[];
+  let cursor=padTop;
+  visPilares.forEach(p=>{
+    const pTop=cursor;
+    cursor+=pilarLabelH;
+    p.objetivos.forEach(o=>{
+      const oTop=cursor;
+      o.ers.forEach((er,i)=>{ yER[er]=cursor+rowH/2; cursor+=rowH; });
+      const oBot=cursor;
+      objBox.push({obj:o.obj, top:oTop, bot:oBot, yc:(oTop+oBot)/2, pilar:p.pilar, aligned:o.aligned});
+      cursor+=gapObj;
+    });
+    cursor+=gapPilar;
+    pilarBox.push({pilar:p.pilar, top:pTop, bot:cursor-gapPilar});
+  });
+  const erBlockH=cursor;
+
+  // Y de operaciones y OE (columna izquierda): agrupar OE bajo su operación
+  // Cada operación ocupa el alto de sus OE-círculos (o 1 si va sola en gris)
+  const opLayout=[]; let oy=padTop;
+  ops.forEach(op=>{
+    // Todos los RE de la operación (alineados y no). Los no alineados se muestran como círculos desconectados.
+    const oesAll=oeAll.filter(o=>o.op===op && o.oe_id);
+    const alignedSet=new Set(oeConnected.filter(o=>o.op===op).map(o=>o.oe_id));
+    const oes=oesAll.map(o=>({...o, aligned:alignedSet.has(o.oe_id)}))
+                    .sort((a,b)=> (a.aligned===b.aligned?0:(a.aligned?-1:1)) || a.oe_id.localeCompare(b.oe_id,undefined,{numeric:true}));
+    const solaGris = !opsAlineadas.has(op);
+    const n = solaGris ? 1 : oes.length;
+    const blockTop=oy;
+    const circles=[];
+    if(!solaGris){
+      oes.forEach((o,i)=>{ circles.push({...o, y: oy + i*(rCircle*2+6) + rCircle}); });
+      oy += n*(rCircle*2+6) + 18;
+    } else {
+      oy += rowH + 10;
+    }
+    const blockBot=oy;
+    opLayout.push({op, solaGris, circles, yc:(blockTop+blockBot)/2 - (solaGris?0:0)});
+  });
+  const opsBlockH=oy;
+
+  const maxH=Math.max(erBlockH, opsBlockH, padTop) + padBot;
+  svg.attr("viewBox",`0 0 1300 ${maxH}`);
+  // Promedios continuos (solo tipo A). Ahora el color del ER de estrategia y sus líneas
+  // se calcula SOLO con los RE de operación efectivamente alineados a ese ER (op|oe_id),
+  // no con el promedio de toda la operación. Mezcla continua entre esos RE.
+  const erAvg={}, objAvg={};
+  // valores de los RE alineados a cada ER de estrategia: er -> [valores]
+  const erVals={};
+  if(!isTC){
+    rows.forEach(r=>{
+      if(r.conn!=="YES"||!r.er||r.er==="None") return;
+      // valor del RE específico; si el oe_id no tiene color propio, cae al promedio de la op
+      let v=oeValue(r.op,r.oe_id);
+      if(v==null) v=opMeanValue(r.op);
+      if(v==null) return;
+      (erVals[r.er]=erVals[r.er]||[]).push(v);
+    });
+    Object.keys(yER).forEach(er=>{
+      const vals=erVals[er]||[];
+      erAvg[er]= vals.length? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+    });
+    objBox.forEach(ob=>{
+      const ersObj=[]; STRATEGY.forEach(p=>p.objetivos.forEach(o=>{ if(o.obj===ob.obj) ersObj.push(...o.ers); }));
+      const vals=[]; ersObj.forEach(er=>{ (erVals[er]||[]).forEach(v=>vals.push(v)); });
+      objAvg[ob.obj]= vals.length? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+    });
+  }
+
+  // Encabezados
+  svg.append("text").attr("class","colhead").attr("x",colOps).attr("y",58).attr("text-anchor","middle").text("Operaciones");
+  if(!isTC){ const chOE=svg.append("text").attr("class","colhead").attr("x",colOE).attr("y",40).attr("text-anchor","middle"); chOE.append("tspan").attr("x",colOE).text("RESULTADO"); chOE.append("tspan").attr("x",colOE).attr("dy",13).text("ESPERADO DE LA"); chOE.append("tspan").attr("x",colOE).attr("dy",13).text("OPERACIÓN"); }
+  svg.append("text").attr("class","colhead").attr("x",colER).attr("y",58).attr("text-anchor","middle").text("Resultado esperado de la estrategia");
+  svg.append("text").attr("class","colhead").attr("x",colObj).attr("y",58).attr("text-anchor","middle").text("Objetivo estratégico");
+
+  // Bandas de pilar (fondo blanco) alrededor de los ER
+  pilarBox.forEach(pb=>{
+    svg.append("rect").attr("x",colER-wER/2-14).attr("y",pb.top-4).attr("width",(colObj+wObj/2)-(colER-wER/2)+28).attr("height",pb.bot-pb.top+8).attr("rx",12).attr("fill","#ffffff").attr("opacity",0.65);
+    svg.append("text").attr("class","pilar-label").attr("x",colER-wER/2-6).attr("y",pb.top+16).attr("fill","var(--accent)").text("PILAR: "+pb.pilar.toUpperCase().slice(0,95));
+  });
+
+  const linkLayer=svg.append("g");
+  const allLinks=[];
+
+  // Links Operación -> ER (una sola línea por operación y ER)
+  opLayout.forEach(ol=>{
+    if(ol.solaGris) return;
+    const ers=[...new Set(rows.filter(r=>r.op===ol.op && r.conn==="YES" && r.er && r.er!=="None" && yER[r.er]!==undefined).map(r=>r.er))];
+    ers.forEach(er=>{
+      const rel=rows.filter(r=>r.op===ol.op && r.er===er && r.conn==="YES");
+      // Color de la línea: mezcla continua de los RE de operación alineados a ESTE er.
+      let lineCol;
+      if(isTC){ lineCol=TC_HEX; }
+      else {
+        const vals=rel.map(r=>oeValue(r.op,r.oe_id)).filter(v=>v!=null);
+        const v = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : opMeanValue(ol.op);
+        lineCol = contHex(v);
+      }
+      const strong=rel.some(r=>r.align==="Strong");
+      const x1=colOps+wOps/2, y1=ol.yc, x2=colER-wER/2, y2=yER[er];
+      const oeList=rel.map(r=>r.oe_id.replace("OE","RE")).join(", ");
+      const _why=(rel.find(r=>r.align==="Strong")||rel.find(r=>r.reasoning&&r.reasoning.trim())||{}).reasoning||"";
+      const path=linkLayer.append("path").attr("class","link").attr("d",curve(x1,y1,x2,y2))
+        .attr("stroke",lineCol).attr("stroke-width",strong?3:1.6).attr("stroke-dasharray",(!isTC&&!strong)?"4,4":null).attr("opacity",0.8)
+        .attr("data-op",ol.op).attr("data-er",er);
+      path.on("mouseover",ev=>showTip(`<b>${ol.op}</b> → ${er}<br>Alineación: <b>${strong?"Strong":"Weak"}</b>`+(_why?`<br><br><span style='color:#dfe7f2'>${_why}</span>`:""),ev))
+        .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",hideTip);
+      allLinks.push({path,op:ol.op,er});
+    });
+  });
+
+  // Links Operación -> Objetivo (filas cuyo related_er es un Objetivo, no un RE)
+  if(SHOW_OBJ_LINKS){
+    const objYc={}; objBox.forEach(ob=>{ objYc[ob.obj]=ob.yc; });
+    opLayout.forEach(ol=>{
+      if(ol.solaGris) return;
+      const objsDir=[...new Set(rows.filter(r=>r.op===ol.op && r.conn==="YES" && isObjRef(r.er) && objYc[objOf(r.er)]!==undefined).map(r=>objOf(r.er)))];
+      objsDir.forEach(obj=>{
+        const rel=rows.filter(r=>r.op===ol.op && objOf(r.er)===obj && r.conn==="YES");
+        const strong=rel.some(r=>r.align==="Strong");
+        const vals=rel.map(r=>oeValue(r.op,r.oe_id)).filter(v=>v!=null);
+        const v = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : opMeanValue(ol.op);
+        const lineCol = isTC ? TC_HEX : contHex(v);
+        const x1=colOps+wOps/2, y1=ol.yc, xc=colObj-wObj/2-24, x2=colObj-wObj/2, y2=objYc[obj];
+        const d=`M${x1},${y1} C${xc},${y1} ${xc},${y2} ${x2},${y2}`;
+        const oeList=rel.map(r=>r.oe_id.replace("OE","RE")).filter(Boolean).join(", ")||"—";
+        const path=linkLayer.append("path").attr("class","link objlink").attr("d",d)
+          .attr("fill","none").attr("stroke",lineCol).attr("stroke-width",strong?1.6:1.2)
+          .attr("stroke-dasharray",(!isTC&&!strong)?"4,4":null)
+          .attr("data-op",ol.op).attr("data-obj",obj);
+        path.on("mouseover",ev=>showTip(`<b>${ol.op}</b> → <i>Objetivo</i>: ${obj}<br>Alineación: <b>${strong?"Strong":"Weak"}</b><br><span style='color:#c8cfdc'>Alineación a nivel de objetivo (sin RE específico)</span><br><span style='color:#c8cfdc'>RE op.: ${oeList}</span>`,ev))
+          .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",hideTip);
+        allLinks.push({path,op:ol.op,er:OBJ_PREFIX+obj,obj:obj,isObj:true});
+      });
+    });
+  }
+
+  // Calificación del RE (I.2): Fuerte si ops fuertes >= ops débiles (empate=Fuerte); si no, Débil.
+  const erRating={};
+  Object.keys(yER).forEach(er=>{
+    const opsER=[...new Set(rows.filter(r=>r.conn==="YES"&&r.er===er&&r.op_type==="A").map(r=>r.op))];
+    let sN=0,wN=0;
+    opsER.forEach(op=>{ (rows.some(r=>r.op===op&&r.er===er&&r.conn==="YES"&&r.align==="Strong")?sN++:wN++); });
+    erRating[er]= opsER.length===0 ? "Sin" : (sN>=wN ? "Fuerte" : "Débil");
+  });
+  // Calificación del objetivo (I.3): Fuerte si al menos un RE del objetivo es Fuerte.
+  const objFuerte={};
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>{ objFuerte[o.obj]=o.ers.some(er=>erRating[er]==="Fuerte"); }));
+  // Links ER -> Objetivo estratégico
+  objBox.forEach(ob=>{
+    STRATEGY.forEach(p=>p.objetivos.forEach(o=>{
+      if(o.obj!==ob.obj) return;
+      o.ers.forEach(er=>{ if(yER[er]===undefined) return;
+        const x1=colER+wER/2, y1=yER[er], x2=colObj-wObj/2, y2=ob.yc;
+        const p=linkLayer.append("path").attr("class","link").attr("d",curve(x1,y1,x2,y2))
+          .attr("stroke", isTC?"#c59dd4":contHex(erAvg[er])).attr("stroke-width",2).attr("stroke-dasharray",(!isTC&&erRating[er]!=="Fuerte")?"4,4":null).attr("opacity", isTC?0.5:0.72);
+        allLinks.push({path:p, er:er, obj:ob.obj, isErObj:true});
+      });
+    }));
+  });
+
+  // Nodos: operaciones + círculos OE
+  opLayout.forEach(ol=>{
+    const g=svg.append("g").attr("data-node-op",ol.op);
+    const pipe = isPipeline(ol.op);
+    const opName = isTC ? "TC" : opColorName(ol.op);
+    const opColor = pipe ? "#ffffff" : (isTC ? TC_HEX : PROB_HEX[opName]);
+    g.append("rect").attr("class","node-rect").attr("x",colOps-wOps/2).attr("y",ol.yc-14).attr("width",wOps).attr("height",28).attr("rx",6)
+      .attr("fill",opColor).attr("opacity",pipe?1:0.95)
+      .attr("stroke", pipe?"#1f4f8a":"none").attr("stroke-width", pipe?1.6:0);
+    g.append("text").attr("class","node-label").attr("x",colOps).attr("y",ol.yc+4).attr("text-anchor","middle").style("fill",pipe?"#1f4f8a":inkOn(opName,isTC)).style("font-weight",700).text(ol.op);
+    if(!ol.solaGris) g.style("cursor","pointer")
+      .on("mouseover",ev=>{ hoverByOp(ol.op); })
+      .on("mouseout",()=>clearHover());
+    // círculos OE (los no alineados se dibujan sin línea; conservan su color si lo tienen)
+    if(!isTC) ol.circles.forEach(c=>{
+      const rel=rows.filter(r=>r.op===c.op&&r.oe_id===c.oe_id&&r.conn==="YES");
+      const anyStrong=rel.some(r=>r.align==="Strong");
+      const cname = isTC ? "TC" : oeColorName(c.op,c.oe_id);
+      const col = isTC ? TC_HEX : PROB_HEX[cname];
+      const hasColor = cname!=="Gris";
+      if(c.aligned){
+        // línea corta operación -> círculo (punteada si el OE no tiene alineación fuerte)
+        svg.append("path").attr("class","link shortlink").attr("data-circle-op",c.op).attr("d",curve(colOE+rCircle, c.y, colOps-wOps/2, ol.yc)).attr("stroke",col).attr("stroke-width",2).attr("stroke-dasharray",anyStrong?null:"4,4").attr("opacity",0.6);
+      }
+      const cg=svg.append("g").attr("data-circle-op",c.op).attr("data-circle-aligned", c.aligned?"1":"0");
+      cg.append("circle").attr("class","node-rect").attr("cx",colOE).attr("cy",c.y).attr("r",rCircle)
+        .attr("fill", col).attr("opacity", c.aligned?0.95:(hasColor?0.85:0.9))
+        .attr("stroke", c.aligned?"none":"#9aa7bd").attr("stroke-width",1.2).attr("stroke-dasharray", c.aligned?null:"3,2");
+      cg.append("text").attr("class","oe-circle-label").attr("x",colOE).attr("y",c.y+3).attr("text-anchor","middle").style("fill",inkOn(cname,isTC)).text(c.oe_id.replace("OE","RE"));
+      cg.style("cursor","pointer").on("mouseover",ev=>{ showTip(`<b>${c.op} · ${c.oe_id.replace("OE","RE")}</b><br>${c.oe}`+(c.aligned?"":"<br><span style='color:#f0c060'>RE sin alinear</span>"),ev); hoverByOp(c.op); })
+        .on("mousemove",ev=>showTip(tip.html(),ev))
+        .on("mouseout",()=>{ hideTip(); clearHover(); });
+    });
+  });
+
+  // Nodos ER  (los no alineados: mismo texto, fondo claro y borde punteado)
+  Object.keys(yER).forEach(er=>{
+    const al = ersData.has(er);
+    const g=svg.append("g").attr("data-node-er",er);
+    const _lines=wrapLabel(er,46,2);
+    const _h=_lines.length>1?42:28;
+    g.append("rect").attr("class","node-rect").attr("x",colER-wER/2).attr("y",yER[er]-_h/2).attr("width",wER).attr("height",_h).attr("rx",6)
+      .attr("fill", al?(isTC?"#c59dd4":contHex(erAvg[er])):"#e7e9ee").attr("opacity", al?(isTC?0.44:0.9):0.9)
+      .attr("stroke","#1f4f8a").attr("stroke-width",1.2).attr("stroke-dasharray", al?null:"4,3").attr("stroke-opacity", al?1:0.55);
+    const _ty=yER[er]-(_lines.length-1)*7+4;
+    _lines.forEach((ln,ix)=>g.append("text").attr("class","node-label").attr("x",colER-wER/2+8).attr("y",_ty+ix*14).text(ln));
+    g.style("cursor","pointer")
+     .on("mouseover",ev=>{ showTip(`<b>${er}</b>`+(al?"":"<br><span style='color:#f0c060'>Sin operaciones alineadas</span>"),ev); hoverByEr(er); })
+     .on("mousemove",ev=>showTip(tip.html(),ev))
+     .on("mouseout",()=>{ hideTip(); clearHover(); });
+  });
+
+  // Nodos Objetivo estratégico
+  const objOpCount={};
+  allLinks.forEach(l=>{ if(l.isObj){ (objOpCount[l.obj]=objOpCount[l.obj]||new Set()).add(l.op); } });
+  objBox.forEach(ob=>{
+    const alObj = (ob.aligned!==undefined) ? ob.aligned : true;
+    const g=svg.append("g").attr("data-node-obj",ob.obj);
+    g.append("rect").attr("class","node-rect").attr("x",colObj-wObj/2).attr("y",ob.yc-22).attr("width",wObj).attr("height",44).attr("rx",6)
+      .attr("fill", alObj?(isTC?"#c4b799":contHex(objAvg[ob.obj])):"#e7e9ee").attr("opacity", alObj?(isTC?0.28:0.82):0.9)
+      .attr("stroke", alObj?"none":"#1f4f8a").attr("stroke-width",1.2).attr("stroke-dasharray", alObj?null:"4,3").attr("stroke-opacity", alObj?1:0.55);
+    const label=ob.obj.length>84?ob.obj.slice(0,82)+"…":ob.obj;
+    g.append("text").attr("class","node-label").attr("x",colObj-wObj/2+8).attr("y",ob.yc-2).attr("font-weight",600).attr("fill",alObj?null:"#5d6b85").text(label.slice(0,42));
+    if(label.length>42) g.append("text").attr("class","node-label").attr("x",colObj-wObj/2+8).attr("y",ob.yc+12).attr("font-weight",600).attr("fill",alObj?null:"#5d6b85").text(label.slice(42,84));
+    const nOps = objOpCount[ob.obj] ? objOpCount[ob.obj].size : 0;
+    g.style("cursor","pointer")
+     .on("mouseover",ev=>{ showTip(`<b>Objetivo estratégico:</b><br>${ob.obj}`+(nOps?`<br><span style='color:#c8cfdc'>${nOps} operación(es) alineada(s) a nivel de objetivo</span>`:"")+(alObj?"":"<br><span style='color:#f0c060'>Sin Resultados Esperados alineados</span>"),ev); hoverByObj(ob.obj); })
+     .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",()=>{ hideTip(); clearHover(); });
+    if(nOps>0){
+      const bg=svg.append("g").attr("class","obj-badge").attr("data-badge-obj",ob.obj).style("cursor","pointer");
+      const bx=colObj+wObj/2-13, by=ob.yc-22-2;
+      bg.append("circle").attr("cx",bx).attr("cy",by).attr("r",11);
+      bg.append("text").attr("x",bx).attr("y",by+3.5).attr("text-anchor","middle").text("+"+nOps);
+      bg.on("mouseover",ev=>{ showTip(`<b>+${nOps} operación(es)</b> alineada(s) a este objetivo a nivel de objetivo (sin RE específico). Pasá el mouse para ver cuáles.`,ev); hoverByObj(ob.obj); })
+        .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",()=>{ hideTip(); clearHover(); });
+    }
+  });
+
+  /* ===== Sistema de resaltado (hover) centralizado ===== */
+  function _dimAllExcept(opSet, erSet, objSet){
+    svg.selectAll("[data-node-op]").classed("node-dim", function(){ return !opSet.has(this.getAttribute("data-node-op")); });
+    svg.selectAll("[data-node-er]").classed("node-dim", function(){ return !erSet.has(this.getAttribute("data-node-er")); });
+    svg.selectAll("[data-node-obj]").classed("node-dim", function(){ return !objSet.has(this.getAttribute("data-node-obj")); });
+    // Circulitos RE de la operación: se atenúan si su operación no está activa.
+    svg.selectAll("g[data-circle-op]").classed("node-dim", function(){ return !opSet.has(this.getAttribute("data-circle-op")); });
+    // Líneas cortas op→círculo: igual criterio.
+    svg.selectAll("path.shortlink[data-circle-op]").classed("dim", function(){ return !opSet.has(this.getAttribute("data-circle-op")); });
+  }
+  function hoverByOp(op){ if(PIN) return; HOVERON=true;
+    const erSet=new Set(), objSet=new Set();
+    allLinks.forEach(l=>{ if((l.isObj||!l.isErObj) && l.op===op){ if(l.isObj) objSet.add(l.obj); else erSet.add(l.er); } });
+    erSet.forEach(er=>{ if(erIndex[er] && erIndex[er].obj) objSet.add(erIndex[er].obj); });
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isErObj) on = erSet.has(l.er);
+      else on = (l.op===op);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", on);
+    });
+    _dimAllExcept(new Set([op]), erSet, objSet);
+  }
+  function hoverByEr(er){ if(PIN) return; HOVERON=true;
+    const opSet=new Set();
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isErObj) on = (l.er===er);
+      else if(l.isObj) on = false;
+      else on = (l.er===er);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", false);
+      if(on && !l.isErObj && !l.isObj) opSet.add(l.op);
+    });
+    const owner = erIndex[er] ? erIndex[er].obj : null;
+    _dimAllExcept(opSet, new Set([er]), owner?new Set([owner]):new Set());
+  }
+  function hoverByObj(obj){ if(PIN) return; HOVERON=true;
+    // Resalta TODA la cadena que llega a este objetivo: líneas directas op→objetivo,
+    // y también la cadena op→RE→objetivo de los RE que cuelgan de este objetivo.
+    const opSet=new Set(), erSet=new Set();
+    Object.keys(erIndex).forEach(er=>{ if(erIndex[er] && erIndex[er].obj===obj) erSet.add(er); });
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isObj) on = (l.obj===obj);
+      else if(l.isErObj) on = (l.obj===obj);
+      else on = erSet.has(l.er);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", on);
+      if(on){ if(l.op) opSet.add(l.op); if(l.er && !l.isObj) erSet.add(l.er); }
+    });
+    _dimAllExcept(opSet, erSet, new Set([obj]));
+  }
+  function clearHover(){ if(PIN) return; HOVERON=false;
+    allLinks.forEach(l=>{ l.path.classed("dim",false); if(l.isObj) l.path.classed("show",false); });
+    svg.selectAll(".node-dim").classed("node-dim",false);
+    svg.selectAll("path.shortlink").classed("dim",false);
+  }
+}
+
+let drawnB=false;
+
+/* ===================== i18n (ES/EN) ===================== */
+var LANG = (function(){ try{ var e=document.getElementById('lang-src'); var v=e?e.textContent.trim():''; if(v && v.indexOf('@@')<0 && /ing/i.test(v)) return 'en'; }catch(x){} return 'es'; })();
+var _T = {
+  "Operaciones*":"Operations*","Cooperaciones Técnicas":"Technical Cooperations","Resumen por ER":"Summary by ER",
+  "Alineación agregada":"Aggregated alignment","Tabla completa":"Full table","Resumen ejecutivo":"Executive summary",
+  "📄 Cargar / reemplazar CSV del agente":"📄 Load / replace agent CSV","🎨 Cargar / reemplazar colores":"🎨 Load / replace colors",
+  "⬇ Descargar tabla (CSV para Excel)":"⬇ Download table (CSV for Excel)","📋 Copiar tabla":"📋 Copy table","⬇ Descargar (CSV para Excel)":"⬇ Download (CSV for Excel)",
+  "🔗 Alineaciones a objetivo: ON":"🔗 Objective-level alignments: ON","🔗 Alineaciones a objetivo: OFF":"🔗 Objective-level alignments: OFF",
+  "Datos precargados. Podés reemplazar el CSV del agente o los colores.":"Data preloaded. You can replace the agent CSV or the colors.",
+  "Operaciones":"Operations","Resultado esperado de la estrategia":"Strategy expected result","Objetivo estratégico":"Strategic objective",
+  "RESULTADO":"EXPECTED","ESPERADO DE LA":"RESULT OF THE","OPERACIÓN":"OPERATION",
+  "Operación":"Operation","Tipo":"Type","RE oper.":"Op. RE","Descripción RE":"RE description","ER estrategia":"Strategy ER",
+  "Pilar":"Pillar","Conex.":"Conn.","Factib.":"Feas.","Alineación":"Alignment","Justificación":"Rationale",
+  "Resultado Esperado (estrategia)":"Expected Result (strategy)","Cooperaciones":"Cooperations","Fuerte":"Strong","Débil":"Weak","Total":"Total",
+  "Tipo de operación":"Operation type","Cantidad":"Count","Operaciones (códigos)":"Operations (codes)","Total sin alineación":"Total unaligned",
+  "Ops. fuertes":"Strong ops","Ops. débiles":"Weak ops","Total alineadas":"Total aligned","Calificación del ER":"ER rating",
+  "Sin cobertura":"No coverage",
+  "Pilares en EBP":"Pillars in CS","Objetivos estratégicos en EBP":"Strategic objectives in CS",
+  "Resultados esperados en EBP":"Expected results in CS","Resultados esperados en EBP cubiertos":"Expected results in CS covered",
+  "Préstamos (INV + INV GR)*":"Loans (INV + INV GR)*",
+  "Operaciones sin alineación con la estrategia":"Operations with no alignment to the strategy"
+};
+var EN_HTML = {
+  "sub":"Each operation is broken down into its <strong>operation Expected Results (RE)</strong>, linked to the country strategy's <strong>Expected Results (ER)</strong>, grouped by Strategic Objective and Pillar. The lines show the degree of alignment.",
+  "intro_A":"<sup class=\"ast\">*</sup>Operations active since the approval of the Country Strategy (approved under the CS and inherited), per OVE criteria (loans, guarantees, grants). Hover over the circles (RE) to see the specific objective, and over the lines to see the rationale. <strong>Click to pin the highlight</strong> (useful to scroll without losing it); click again or on empty space to release. ",
+  "intro_B":"Technical Cooperations. Their alignment, when it exists, is of limited scope.",
+  "intro_noalin":"Operations whose classification found no link to any strategy Expected Result (all their rows with logical connection = NO).",
+  "intro_agregada":"Rating of each Expected Result based on its aligned operations: <strong>Strong</strong> if strongly-aligned operations are the majority or there is a tie (one strong and one weak counts as Strong); <strong>Weak</strong> if weakly-aligned operations predominate; <strong>No coverage</strong> if there are no aligned operations. The strategy objective is considered <strong>strong when at least one of its Expected Results is strong</strong> (reflected in the lines toward the objective). Technical Cooperations are not considered in this rating.",
+  "intro_resumenejec":"Executive summary of the portfolio–strategy alignment (generated in the flow).",
+  "legnote":"Probability of achievement per operation (portfolio review), scale 0–1: Low=0, Medium=0.5, High=1. Each operation's color comes from the aggregation rule over its Expected Results (RE); the color of the strategy's Expected Results and objectives is the simple average (0–1) of the aligned type-A operations with reviewed probability — thresholds: ≤0.25 low · 0.25–0.70 medium · ≥0.70 high. Technical Cooperations do not carry a probability color (light blue).",
+  "footer":"Source: exercise classifying the alignment of the portfolio with the country strategy's Expected Results. RE = operation Expected Result (specific objective). ER = strategy Expected Result.",
+  "leg1":"<span style=\"font-weight:700;color:var(--ink)\">Probability of achievement (operations):</span>",
+  "leg2":"<span class=\"dot\" style=\"background:var(--alta)\"></span> High",
+  "leg3":"<span class=\"dot\" style=\"background:var(--media)\"></span> Medium",
+  "leg4":"<span class=\"dot\" style=\"background:var(--baja)\"></span> Low",
+  "leg5":"<span class=\"dot\" style=\"background:var(--sinrev)\"></span> Not reviewed",
+  "leg6":"<span style=\"font-weight:700;color:var(--ink)\">Strategy ER / objective:</span> <span class=\"bar\"></span> average (continuous)",
+  "leg7":"<span class=\"dot\" style=\"background:var(--tc)\"></span> Technical Cooperation",
+  "leg8":"<span style=\"font-weight:700;color:var(--ink)\">Line:</span> <span class=\"sw\" style=\"border-top-color:#8a97ad\"></span> strong · <span class=\"sw\" style=\"border-top-color:#8a97ad;border-top-style:dashed\"></span> weak"
+};
+function translateUI(){
+  if(LANG!=='en') return;
+  try{
+    document.querySelectorAll('[data-i18n]').forEach(function(el){ var k=el.getAttribute('data-i18n'); if(EN_HTML[k]!=null) el.innerHTML=EN_HTML[k]; });
+    document.querySelectorAll('.tab, button.loadbtn, th, .badge, .stat .l, h2, #loadstatus').forEach(function(el){
+      var key=(el.textContent||'').trim(); if(_T[key]!=null) el.textContent=_T[key];
+    });
+    document.querySelectorAll('.colhead').forEach(function(el){
+      var tsp=el.querySelectorAll('tspan');
+      if(tsp.length){ tsp.forEach(function(t){ var k=(t.textContent||'').trim(); if(_T[k]!=null) t.textContent=_T[k]; }); }
+      else { var k=(el.textContent||'').trim(); if(_T[k]!=null) el.textContent=_T[k]; }
+    });
+    var h=document.getElementById('page-title');
+    if(h){ h.innerHTML=h.innerHTML.replace('Vinculación de la Estrategia de País con la Cartera','Country Strategy–Portfolio Alignment'); }
+    document.title=document.title.replace('Vinculación de la Estrategia de País con la Cartera','Country Strategy–Portfolio Alignment');
+  }catch(e){}
+}
+
+function renderAll(){
+  computeStats();
+  drawSankey("#chart-A", ROWS.filter(r=>r.op_type==="A"));
+  drawnB=false;
+  // si la pestaña B está activa, redibujar
+  if(document.getElementById("tab-B").classList.contains("active")){ drawSankey("#chart-B", ROWS.filter(r=>r.op_type==="B")); drawnB=true; }
+  buildTable();
+  buildResumen();
+  buildNoAlineadas();
+  buildDiag();
+  buildAgregada();
+  try{translateUI();}catch(e){}
+}
+drawSankey("#chart-A", ROWS.filter(r=>r.op_type==="A"));
+try{translateUI();}catch(e){}
+
+/* Toggle en vivo: muestra u oculta las alineaciones a nivel de Objetivo Estratégico. */
+function toggleObjLinks(){
+  SHOW_OBJ_LINKS = !SHOW_OBJ_LINKS;
+  var b=document.getElementById("toggleObj");
+  if(b) b.textContent = "🔗 Alineaciones a objetivo: " + (SHOW_OBJ_LINKS ? "ON" : "OFF");
+  renderAll();
+}
+
+// Tabla
+function buildTable(){
+  let rows="";
+  const sorted=ROWS.slice().sort((a,b)=>a.op.localeCompare(b.op)||a.oe_id.localeCompare(b.oe_id));
+  sorted.forEach(r=>{
+    const badge=r.align==="Strong"?'<span class="badge strong">Strong</span>':r.align==="Weak"?'<span class="badge weak">Weak</span>':'<span class="badge none">None</span>';
+    const meta=r.er&&r.er!=="None"&&erIndex[r.er]?erIndex[r.er].pilar:"—";
+    rows+=`<tr><td class="col-op">${r.op}</td><td class="col-num">${r.op_type}</td><td>${r.oe_id.replace("OE","RE")}</td><td>${r.oe||""}</td><td>${r.er||"None"}</td><td>${meta}</td><td class="col-num">${r.conn}</td><td class="col-num">${r.feas||"—"}</td><td>${badge}</td><td>${r.reasoning||""}</td></tr>`;
+  });
+  document.getElementById("align-table-wrap").innerHTML=`<table class="align-table"><thead><tr>
+    <th>Operación</th><th>Tipo</th><th>RE oper.</th><th>Descripción RE</th><th>ER estrategia</th><th>Pilar</th><th>Conex.</th><th>Factib.</th><th>Alineación</th><th>Justificación</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+buildTable();
+
+/* ====== TABLA RESUMEN por ER (fuerte/débil/total + códigos), A y B por separado ====== */
+function resumenData(){
+  const allER=[];
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>allER.push({er, pilar:p.pilar}))));
+  return allER.map(({er,pilar})=>{
+    const filas=ROWS.filter(r=>r.conn==="YES"&&r.er===er);
+    function agg(tipo){
+      const all=[...new Set(filas.filter(r=>r.op_type===tipo).map(r=>r.op))];
+      const strong=[...new Set(filas.filter(r=>r.op_type===tipo&&r.align==="Strong").map(r=>r.op))];
+      const weak=[...new Set(filas.filter(r=>r.op_type===tipo&&r.align==="Weak").map(r=>r.op))];
+      return {strong, weak, all};
+    }
+    return {er, pilar, A:agg("A"), B:agg("B")};
+  });
+}
+
+function buildResumen(){
+  const data=resumenData();
+  let rows=""; let currentPilar=null;
+  data.forEach(d=>{
+    if(d.pilar!==currentPilar){ currentPilar=d.pilar; rows+=`<tr class="pilar-row"><td colspan="7">${d.pilar}</td></tr>`; }
+    const aS=d.A.strong.length, aW=d.A.weak.length;
+    const bT=d.B.all.length;
+    const codesA=[...d.A.strong, ...d.A.weak].join(", ");
+    const codesB=d.B.all.join(", ");
+    rows+=`<tr>
+      <td class="er-cell">${d.er}</td>
+      <td class="col-num">${aS}</td><td class="col-num">${aW}</td><td class="col-num">${aS+aW}</td>
+      <td class="op-codes">${codesA||"—"}</td>
+      <td class="col-num">${bT}</td>
+      <td class="op-codes">${codesB||"—"}</td>
+    </tr>`;
+  });
+  document.getElementById("resumen-table-wrap").innerHTML=`
+    <table class="align-table resumen-table">
+      <thead>
+        <tr><th rowspan="2">Resultado Esperado (estrategia)</th>
+          <th colspan="4" style="text-align:center;">Operaciones</th>
+          <th colspan="2" style="text-align:center;">Cooperaciones Técnicas </th></tr>
+        <tr><th>Fuerte</th><th>Débil</th><th>Total</th><th>Operaciones </th>
+          <th>Total</th><th>Cooperaciones </th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+/* ====== DIAGNÓSTICO: related_er (conn=YES) que NO coinciden con la estrategia ======
+   Red de seguridad al cambiar de país o al correr de nuevo el agente. Lista las
+   cadenas que quedaron sin vincular para corregirlas en el agente o sumarlas a
+   ER_ALIASES. (Se evalúa después de canonicalER, así que solo marca lo que la
+   normalización no pudo resolver: reformulaciones reales, no diferencias de formato.) */
+function erDiagnostic(){
+  const stratSet=new Set();
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>stratSet.add(er))));
+  const misses={};
+  ROWS.forEach(r=>{
+    // Los ##OBJ## son alineaciones a nivel de Objetivo Estratégico (ya resueltas por canonicalER): NO son errores.
+    if(r.conn==="YES" && r.er && r.er!=="None" && !isObjRef(r.er) && !stratSet.has(r.er)){
+      (misses[r.er]=misses[r.er]||new Set()).add(r.op);
+    }
+  });
+  return Object.keys(misses).sort().map(er=>({er, ops:[...misses[er]].sort()}));
+}
+function buildDiag(){
+  const d=erDiagnostic();
+  if(d.length===0){
+    console.log("[diagnóstico ER] ✓ Todos los related_er con conexión coinciden con un ER de la estrategia.");
+    return;
+  }
+  console.warn("[diagnóstico ER] ⚠ "+d.length+" texto(s) de related_er sin coincidencia con la estrategia (quedaron SIN vincular). Corregir la redacción en el agente o agregar la variante a ER_ALIASES:");
+  d.forEach(x=>console.warn('  • "'+x.er+'"  ('+x.ops.length+' oper.: '+x.ops.join(", ")+')'));
+}
+
+/* ====== Operaciones SIN alineación (ninguna fila con conn=YES) ====== */
+function noAlineadasData(){
+  const allOps=[...new Set(ROWS.map(r=>r.op))];
+  const opType={}; ROWS.forEach(r=>{ opType[r.op]=r.op_type; });
+  const alineadas=new Set(ROWS.filter(r=>r.conn==="YES").map(r=>r.op));
+  const sin=allOps.filter(op=>!alineadas.has(op));
+  return { A:sin.filter(op=>opType[op]==="A").sort(), B:sin.filter(op=>opType[op]==="B").sort() };
+}
+function buildNoAlineadas(){
+  const {A,B}=noAlineadasData();
+  const fila=(tipo,codes)=>`<tr>
+      <td>${tipo}</td><td class="col-num">${codes.length}</td><td class="op-codes">${codes.join(", ")||"—"}</td>
+    </tr>`;
+  document.getElementById("noalin-table-wrap").innerHTML=`
+    <table class="align-table resumen-table">
+      <thead><tr><th>Tipo de operación</th><th>Cantidad</th><th>Operaciones (códigos)</th></tr></thead>
+      <tbody>
+        ${fila("Operaciones (préstamos, garantías, grants)",A)}
+        ${fila("Cooperaciones Técnicas",B)}
+        <tr class="pilar-row"><td>Total sin alineación</td><td class="col-num">${A.length+B.length}</td><td></td></tr>
+      </tbody>
+    </table>`;
+}
+
+function descargarResumenCSV(){
+  const data=resumenData();
+  let csv="Pilar,Resultado Esperado,A_Fuerte,A_Debil,A_Total,Operaciones_A,B_Total,Cooperaciones_B\n";
+  data.forEach(d=>{
+    const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+    csv+=[q(d.pilar),q(d.er),d.A.strong.length,d.A.weak.length,d.A.strong.length+d.A.weak.length,
+          q([...d.A.strong,...d.A.weak].join(", ")),
+          d.B.strong.length+d.B.weak.length,
+          q([...d.B.strong,...d.B.weak].join(", "))].join(",")+"\n";
+  });
+  bajarCSV(csv,"resumen_alineacion.csv","copystatus");
+}
+
+function bajarCSV(csv,nombre,statusId){
+  const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8;"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=nombre; a.click();
+  if(statusId) document.getElementById(statusId).textContent="✓ CSV descargado.";
+}
+
+// Copiar cualquier tabla al portapapeles (para Excel)
+function copiarTabla(selector, statusId){
+  const tabla=document.querySelector(selector);
+  if(!tabla) return;
+  const range=document.createRange(); range.selectNode(tabla);
+  const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  try{ document.execCommand("copy"); if(statusId) document.getElementById(statusId).textContent="✓ Tabla copiada — pegala en Excel."; }
+  catch(e){ if(statusId) document.getElementById(statusId).textContent="Seleccioná la tabla y copiá manualmente."; }
+  sel.removeAllRanges();
+}
+function copiarResumen(){ copiarTabla("#resumen-table-wrap table","copystatus"); }
+
+/* ====== TAB ALINEACIÓN AGREGADA — rating por ER (solo operaciones A) ====== */
+function agregadaData(){
+  // Para cada RE: calificación por operaciones A alineadas (I.2).
+  // Fuerte si ops fuertes >= ops débiles (empate -> Fuerte); Débil si débiles > fuertes; Sin cobertura si 0.
+  const allER=[];
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>allER.push({er, pilar:p.pilar}))));
+  return allER.map(({er,pilar})=>{
+    const filas=ROWS.filter(r=>r.conn==="YES"&&r.er===er&&r.op_type==="A");
+    const opsER=[...new Set(filas.map(r=>r.op))];
+    const strong=opsER.filter(op=>filas.some(r=>r.op===op&&r.align==="Strong"));
+    const weak=opsER.filter(op=>!filas.some(r=>r.op===op&&r.align==="Strong"));
+    const total=opsER.length;
+    let rating="Sin cobertura";
+    if(total>0) rating = (strong.length>=weak.length) ? "Fuerte" : "Débil";
+    return {er, pilar, nStrong:strong.length, nWeak:weak.length, total, rating};
+  });
+}
+function buildAgregada(){
+  const data=agregadaData();
+  let rows=""; let currentPilar=null;
+  data.forEach(d=>{
+    if(d.pilar!==currentPilar){ currentPilar=d.pilar; rows+=`<tr class="pilar-row"><td colspan="5">${d.pilar}</td></tr>`; }
+    const badge = d.rating==="Fuerte" ? '<span class="badge strong">Fuerte</span>'
+               : d.rating==="Débil" ? '<span class="badge weak">Débil</span>'
+               : '<span class="badge none">Sin cobertura</span>';
+    rows+=`<tr>
+      <td class="er-cell">${d.er}</td>
+      <td class="col-num">${d.nStrong}</td>
+      <td class="col-num">${d.nWeak}</td>
+      <td class="col-num">${d.total}</td>
+      <td>${badge}</td>
+    </tr>`;
+  });
+  document.getElementById("agregada-table-wrap").innerHTML=`
+    <table class="align-table resumen-table">
+      <thead><tr>
+        <th>Resultado Esperado (estrategia)</th>
+        <th>Ops. fuertes</th><th>Ops. débiles</th><th>Total alineadas</th>
+        <th>Calificación del ER</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+function descargarAgregadaCSV(){
+  const data=agregadaData();
+  let csv="Pilar,Resultado Esperado,Ops_Fuertes,Ops_Debiles,Total_Alineadas,Calificacion_ER\n";
+  data.forEach(d=>{
+    const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+    csv+=[q(d.pilar),q(d.er),d.nStrong,d.nWeak,d.total,q(d.rating)].join(",")+"\n";
+  });
+  bajarCSV(csv,"alineacion_agregada.csv","copystatus2");
+}
+buildResumen();
+buildNoAlineadas();
+buildDiag();
+buildAgregada();
+
+function parseAgentCSV(text){
+  var rows=parseCSV(text);
+  // normalizar filas: detectar nivel (OE/OP), proyecto y campos
+  var norm=[];
+  for(var i=0;i<rows.length;i++){
+    var r=rows[i]; if(!r||r.length<8) continue;
+    var nivel="", f=r;
+    if(r[0]==="OE"||r[0]==="OP"){ nivel=r[0]; f=r.slice(1); }
+    if(f.length<9) continue;
+    var proj=(f[0]||"").trim(); var _pl=proj.toLowerCase(); if(!proj||_pl==="project"||_pl==="nivel") continue;
+    norm.push({nivel:nivel, proj:proj, f:f});
+  }
+  // proyectos que tienen filas OE (Type A). Para esos, ignoramos las OP.
+  var conOE={}; norm.forEach(function(x){ if(x.nivel!=="OP") conOE[x.proj]=true; });
+  var out=[];
+  norm.forEach(function(x){
+    // filas OP solo se usan si el proyecto NO tiene filas OE (caso TC: solo OP)
+    if(x.nivel==="OP" && conOE[x.proj]) return;
+    var f=x.f;
+    out.push({op:x.proj, op_type:(/-T/i.test(x.proj)?"B":"A"), oe_id:(f[1]||"OE1").trim()||"OE1",
+      oe:(f[2]||"").trim(), er:canonicalER((f[5]||"None").trim()||"None"),
+      conn:(f[4]||"NO").trim().toUpperCase(), feas:(f[6]||"").trim(),
+      align:(f[7]||"").trim(), reasoning:(f[8]||"").trim()});
+  });
+  return out;
+}
+function buildStrategyFromFlat(text){
+  var lines=text.replace(/\r/g,'').split('\n'); var order=[]; var map={};
+  for(var i=0;i<lines.length;i++){ var ln=lines[i]; if(!ln.trim()) continue;
+    var p=ln.split('|'); if(p.length<3) continue;
+    var area=p[0].trim(), obj=p[1].trim(), er=p.slice(2).join('|').trim();
+    if(!area || area.toLowerCase()==='areaprioritaria') continue;
+    if(!map[area]){ map[area]={order:[],objs:{}}; order.push(area); }
+    if(!map[area].objs[obj]){ map[area].objs[obj]=[]; map[area].order.push(obj); }
+    if(er) map[area].objs[obj].push(er);
+  }
+  return order.map(function(a){ return {pilar:a, objetivos:map[a].order.map(function(o){ return {obj:o, ers:map[a].objs[o]}; })}; });
+}
+function initResumen(){
+  try{ var el=document.getElementById('resumen-src'), cont=document.getElementById('resumen-ejec-cont'),
+    btn=document.querySelector('[data-tab="resumenejec"]');
+    var t=el?el.textContent.trim():"";
+    if(t && !(t.charAt(0)==='@'&&t.charAt(1)==='@')){ if(cont) cont.textContent=t; }
+    else { if(cont) cont.textContent='El resumen ejecutivo se genera en el flujo. En esta vista no hay uno cargado.'; }
+  }catch(e){ console.log('resumen',e); }
+}
+function switchTab(name){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===name));
+  document.querySelectorAll(".tab-content").forEach(c=>c.classList.remove("active"));
+  document.getElementById("tab-"+name).classList.add("active");
+  applyLegend();
+  if(name==="B"&&!drawnB){ drawSankey("#chart-B", ROWS.filter(r=>r.op_type==="B")); drawnB=true; } try{translateUI();}catch(e){}
+}
+
+/* ============================================================
+   CARGA DE CSV — el usuario sube el output del agente y se redibuja.
+   Columnas esperadas: project,oe_id,oe_text,er_slot,logical_connection,
+                       related_er,feasibility,alignment,reasoning
+   ============================================================ */
+function parseCSV(text){
+  // Parser que respeta comillas dobles y saltos internos
+  const rows=[]; let i=0, field='', row=[], inQ=false;
+  text=text.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  while(i<text.length){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){ if(text[i+1]==='"'){ field+='"'; i+=2; continue; } inQ=false; i++; continue; }
+      field+=c; i++; continue;
+    } else {
+      if(c==='"'){ inQ=true; i++; continue; }
+      if(c===','){ row.push(field); field=''; i++; continue; }
+      if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; i++; continue; }
+      field+=c; i++; continue;
+    }
+  }
+  if(field.length||row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r=>r.length>1 || (r.length===1 && r[0].trim()!==''));
+}
+
+function inferType(op){ return /-T/i.test(op)?"B":"A"; }
+
+function csvToRows(text){
+  const parsed=parseCSV(text);
+  if(parsed.length<2) return [];
+  const header=parsed[0].map(h=>h.trim().toLowerCase());
+  const idx=name=>header.indexOf(name);
+  const iProj=idx("project"), iOe=idx("oe_id"), iOeT=idx("oe_text"),
+        iConn=idx("logical_connection"), iEr=idx("related_er"),
+        iFeas=idx("feasibility"), iAlign=idx("alignment"), iReason=idx("reasoning");
+  const out=[];
+  for(let k=1;k<parsed.length;k++){
+    const r=parsed[k]; if(!r[iProj]||r[iProj].trim()==='') continue;
+    const op=r[iProj].trim();
+    const conn=(r[iConn]||"").trim().toUpperCase();
+    let align=(iAlign>=0?r[iAlign]:"").trim();
+    // normalizar capitalización
+    const capital=s=>s?s.charAt(0).toUpperCase()+s.slice(1).toLowerCase():s;
+    align=capital(align);
+    let feas=capital((iFeas>=0?r[iFeas]:"").trim());
+    // TC sin alignment pero con conexión -> Weak
+    if(conn==="YES" && (!align||align==="")) align="Weak";
+    if(conn==="NO") align="None";
+    out.push({
+      op, op_type:inferType(op),
+      oe_id:(r[iOe]||"OE1").trim(),
+      oe:(iOeT>=0?r[iOeT]:"").trim(),
+      er:canonicalER(iEr>=0?r[iEr]:"None"),
+      conn:conn||"NO",
+      feas, align,
+      reasoning:(iReason>=0?r[iReason]:"").trim()
+    });
+  }
+  return out;
+}
+
+/* (Carga por CSV desactivada: los datos se embeben directamente en ROWS.) */
+
+/* Si no hay colores cargados, ocultar la leyenda de probabilidad. */
+applyLegend();
+
+/* ===== Carga de archivos (agente o colores) — a prueba de botón ===== */
+function _setStatus(msg, ok){
+  var el=document.getElementById("loadstatus"); if(!el) return;
+  el.textContent=msg;
+  el.style.color = ok===true ? "#1f7a44" : (ok===false ? "#b23b3b" : "");
+  el.style.fontWeight="600";
+}
+function loadCSVText(text, fname){
+  var h; try{ var p=parseCSV(text); h=p.length?p[0].map(function(x){return x.trim().toLowerCase();}):[]; }catch(e){ h=[]; }
+  var hasColor = h.indexOf("color")>=0;
+  var hasAgent = h.indexOf("related_er")>=0 || h.indexOf("oe_text")>=0 || h.indexOf("alignment")>=0;
+  try{
+    if(hasColor && !hasAgent){
+      COLOR_OE=csvToColors(text); rebuildColors(); applyLegend(); renderAll();
+      var n=Object.keys(COLOR_OE).length;
+      _setStatus("\u2713 Colores cargados desde "+fname+": "+n+" operaciones.", n>0);
+    } else if(hasAgent){
+      var rows=csvToRows(text);
+      if(!rows.length){ _setStatus("El CSV del agente no tiene filas válidas.", false); return; }
+      ROWS=rows; renderAll();
+      _setStatus("\u2713 Datos del agente cargados desde "+fname+": "+ROWS.length+" filas.", true);
+    } else {
+      _setStatus("No reconozco las columnas de "+fname+". Necesita 'color' (colores) o 'related_er' (agente).", false);
+    }
+  }catch(err){ _setStatus("Error al leer "+fname+": "+err.message, false); }
+}
+(function(){
+  ["csvfile","colorfile"].forEach(function(id){
+    var inp=document.getElementById(id); if(!inp) return;
+    inp.addEventListener("change",function(ev){
+      var file=ev.target.files && ev.target.files[0]; if(!file) return;
+      var reader=new FileReader();
+      reader.onload=function(e){ loadCSVText(e.target.result, file.name); };
+      reader.onerror=function(){ _setStatus("No se pudo leer el archivo.", false); };
+      reader.readAsText(file,"UTF-8");
+      ev.target.value="";   /* permite recargar el mismo archivo */
+    });
+  });
+})();
+
+initResumen();
+(function(){ var h=document.getElementById('page-title'); if(h && h.textContent.indexOf('@@')>=0){ var t=h.textContent.replace(/\s*[—-]\s*@@[^@]*@@\s*$/,''); h.textContent=t; document.title=t; } })();
+</script>
+
+</body>
+</html>

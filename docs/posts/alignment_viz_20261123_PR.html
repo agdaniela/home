@@ -1,0 +1,1905 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vinculación de la Estrategia de País con la Cartera — Paraguay</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#e6f2fb;--panel:#d5e8f5;--ink:#1a2238;--muted:#5d6b85;--line:#bcd4e6;
+    --viz-max:1300px; /* ancho máx. del diagrama: bajalo (ej. 1000px) para verlo más chico */
+    --strong:#1f4f8a;      /* azul oscuro: alineación fuerte */
+    --weak:#7fb2e5;        /* azul claro: alineación débil */
+    --none:#c9d2de;        /* gris: sin alineación */
+    --alta:#3fb96b;        /* verde: probabilidad de logro alta */
+    --media:#f2c14e;       /* amarillo: probabilidad media */
+    --baja:#e89b6e;        /* rojo/naranja: probabilidad baja */
+    --sinrev:#c2cad6;      /* gris: sin revisar */
+    --tc:#6cb2e4;          /* celeste: cooperaciones técnicas */
+    --accent:#1f4f8a;
+    --font:"Montserrat",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font);}
+  header{padding:24px 36px 14px;border-bottom:1px solid var(--line);background:#d5e8f5;}
+  h1{font-size:23px;margin:0 0 5px;font-weight:600;color:var(--ink);}
+  .sub{font-size:12.5px;color:var(--muted);line-height:1.5;max-width:1180px;font-weight:400;}
+  .loadbar{margin:14px 36px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .loadbtn{background:var(--accent);color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);transition:background .15s;}
+  .loadbtn:hover{background:#163a66;}
+  .resumen-actions{margin:16px 36px 0;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .loadbtn.secundario{background:#fff;color:var(--accent);border:1.5px solid var(--accent);}
+  .loadbtn.secundario:hover{background:#eaf3fb;}
+  table.resumen-table .er-cell{max-width:340px;}
+  table.resumen-table .op-codes{font-size:10.5px;color:var(--muted);}
+  .pilar-row td{background:#1f4f8a !important;color:#fff !important;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;}
+  table.align-table tr.pilar-row td, table.resumen-table tr.pilar-row td{color:#fff !important;background:#1f4f8a !important;}
+  #loadstatus{font-size:12px;color:var(--muted);font-style:italic;}
+  .stats{display:flex;gap:28px;flex-wrap:wrap;margin:14px 36px 4px;}
+  .stat .n{font-size:26px;font-weight:700;color:var(--ink);}
+  .stat .l{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:500;}
+  .stat .l sup.ast{color:var(--muted);font-weight:700;font-size:11px;}
+  .stats-foot{margin:2px 36px 8px;font-size:10.5px;color:var(--accent);font-style:italic;max-width:1180px;line-height:1.5;}
+  .legend{display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin:10px 36px 4px;font-size:12px;color:var(--muted);font-weight:400;}
+  .legend .grp{display:flex;gap:8px;align-items:center;}
+  .legend .sw{width:26px;height:0;border-top-width:3px;border-top-style:solid;}
+  .legend .dot{width:12px;height:12px;border-radius:50%;}
+  .legend .bar{width:80px;height:11px;border-radius:3px;display:inline-block;background:linear-gradient(90deg,#e0524d 0%,#ef8a4d 25%,#f2c14e 50%,#b6c84a 75%,#3fb96b 100%);}
+  svg{display:block;width:100%;max-width:var(--viz-max);background:transparent;font-family:var(--font);}
+  .node-label{font-size:11px;fill:var(--ink);cursor:default;font-weight:500;}
+  .oe-circle-label{font-size:9px;fill:#fff;font-weight:700;pointer-events:none;}
+  .node-rect{cursor:pointer;}
+  .link{fill:none;transition:opacity .18s;}
+  .dim{opacity:.06 !important;}
+  .objlink{opacity:0 !important;}            /* líneas op→objetivo ocultas en reposo */
+  .objlink.show{opacity:.85 !important;}     /* visibles al hover de su operación/objetivo */
+  .node-dim{opacity:.18 !important;transition:opacity .18s;}
+  .node-hi{stroke:#f0a030 !important;stroke-width:2.5 !important;}
+  .obj-badge{cursor:default;}
+  .obj-badge circle{fill:#1f4f8a;}
+  .obj-badge text{fill:#fff;font-size:10px;font-weight:700;}
+  .pilar-label{font-size:10.5px;font-weight:700;letter-spacing:.2px;}
+  .colhead{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.1px;fill:var(--accent);}
+  .tip{position:fixed;pointer-events:none;background:#1a2238;border:1px solid var(--line);border-radius:8px;padding:11px 14px;font-size:12px;color:#fff;max-width:440px;opacity:0;transition:opacity .12s;box-shadow:0 8px 26px rgba(0,0,0,.25);z-index:9;font-weight:400;line-height:1.45;}
+  footer{padding:14px 36px 30px;font-size:10.5px;color:var(--muted);border-top:1px solid var(--line);font-weight:400;}
+  .tabs{display:flex;gap:4px;margin:14px 36px 0;border-bottom:2px solid var(--line);}
+  .tab{padding:9px 20px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;border:2px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;background:transparent;transition:all .15s;font-family:var(--font);}
+  .tab:hover{color:var(--ink);background:rgba(31,79,138,.05);}
+  .tab.active{color:var(--accent);background:#fff;border-color:var(--line);border-bottom:2px solid #fff;margin-bottom:-2px;}
+  .tab-content{display:none;}
+  .tab-content.active{display:block;}
+  .tab-intro{margin:12px 36px 0;font-size:12px;color:var(--muted);font-style:italic;}
+  .align-table-wrap{margin:14px 36px 30px;overflow-x:auto;}
+  table.align-table{border-collapse:collapse;width:100%;font-size:11.5px;background:#fff;}
+  table.align-table th{background:var(--accent);color:#fff;font-weight:600;text-align:left;padding:8px 10px;border:1px solid #15375f;position:sticky;top:0;}
+  table.align-table td{padding:7px 10px;border:1px solid var(--line);vertical-align:top;line-height:1.4;color:var(--ink);}
+  table.align-table tr:nth-child(even) td{background:#f7fafd;}
+  .badge{display:inline-block;padding:3px 9px;border-radius:10px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+  .badge.strong{background:#1f4f8a;color:#fff;}
+  .badge.weak{background:#d3e6f8;color:#1f4f8a;}
+  .badge.none{background:#f2f2f2;color:#888;}
+  .col-op{font-weight:700;white-space:nowrap;}
+  .col-num{text-align:center;font-weight:600;}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="page-title">Vinculación de la Estrategia de País con la Cartera — Paraguay</h1>
+  <div class="sub" data-i18n="sub">Cada operación se despliega en sus <strong>Resultados Esperados de la operación (RE)</strong>, que se vinculan con los <strong>Resultados Esperados de la estrategia (ER)</strong>, agrupados por Objetivo Estratégico y Pilar. Las líneas indican el grado de alineación.</div>
+</header>
+
+<div style="margin:8px 36px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+  <label class="loadbtn" for="csvfile">📄 Cargar / reemplazar CSV del agente</label>
+  <input type="file" id="csvfile" accept=".csv,text/csv" style="display:none">
+  <label class="loadbtn secundario" for="colorfile">🎨 Cargar / reemplazar colores</label>
+  <input type="file" id="colorfile" accept=".csv,text/csv" style="display:none">
+  <span id="loadstatus">Datos precargados. Podés reemplazar el CSV del agente o los colores.</span>
+  <span id="colorstatus" style="font-size:12px;color:var(--muted);font-style:italic;"></span>
+  <button type="button" id="toggleObj" class="loadbtn secundario" onclick="toggleObjLinks()" title="Alterna si se muestran las alineaciones a nivel de Objetivo Estratégico">🔗 Alineaciones a objetivo: ON</button>
+</div>
+
+<div class="stats" id="stats"></div>
+<div class="stats-foot" id="stats-foot"></div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="A" onclick="switchTab('A')">Operaciones*</button>
+  <button class="tab" data-tab="B" onclick="switchTab('B')">Cooperaciones Técnicas </button>
+  <button class="tab" data-tab="resumen" onclick="switchTab('resumen')">Resumen por ER</button>
+  <button class="tab" data-tab="agregada" onclick="switchTab('agregada')">Alineación agregada</button>
+  <button class="tab" data-tab="tabla" onclick="switchTab('tabla')">Tabla completa</button>
+  <button class="tab" data-tab="resumenejec" onclick="switchTab('resumenejec')">Resumen ejecutivo</button>
+</div>
+
+<div class="legend" id="legend">
+  <div class="grp" data-i18n="leg1"><span style="font-weight:700;color:var(--ink)">Probabilidad de logro (operaciones):</span></div>
+  <div class="grp" data-i18n="leg2"><span class="dot" style="background:var(--alta)"></span> Alta</div>
+  <div class="grp" data-i18n="leg3"><span class="dot" style="background:var(--media)"></span> Media</div>
+  <div class="grp" data-i18n="leg4"><span class="dot" style="background:var(--baja)"></span> Baja</div>
+  <div class="grp" data-i18n="leg5"><span class="dot" style="background:var(--sinrev)"></span> Sin revisar</div>
+  <div class="grp" data-i18n="leg6" style="margin-left:10px"><span style="font-weight:700;color:var(--ink)">RE de estrategia / objetivo:</span> <span class="bar"></span> promedio (continuo)</div>
+  <div class="grp" data-i18n="leg7" style="margin-left:10px"><span class="dot" style="background:var(--tc)"></span> Cooperación Técnica</div>
+  <div class="grp" data-i18n="leg8" style="margin-left:10px"><span style="font-weight:700;color:var(--ink)">Trazo:</span> <span class="sw" style="border-top-color:#8a97ad"></span> fuerte · <span class="sw" style="border-top-color:#8a97ad;border-top-style:dashed"></span> débil</div>
+</div>
+<div id="legend-note" data-i18n="legnote" style="margin:2px 36px 6px;font-size:11px;color:var(--muted);font-style:italic;max-width:1180px;line-height:1.5;">Probabilidad de logro por operación (revisión de cartera), escala 0–1: Baja=0, Media=0.5, Alta=1. El color de cada operación surge de la regla de agregación sobre sus Resultados Esperados (RE); el de los Resultados Esperados de la estrategia y los objetivos es el promedio simple (0–1) de las operaciones tipo A alineadas con probabilidad revisada — umbrales: ≤0.25 baja · 0.25–0.70 media · ≥0.70 alta. Las Cooperaciones Técnicas no llevan color de probabilidad (celeste).</div>
+
+<div class="tab-content active" id="tab-A">
+  <div class="tab-intro" data-i18n="intro_A"><sup class="ast">*</sup>Operaciones activas desde la aprobación de la EBP (aprobadas bajo la EBP y heredadas) de acuerdo con los criterios de OVE (préstamos, garantías, grants). Pase el cursor sobre los círculos (RE) para ver el objetivo específico, y sobre las líneas para ver la justificación. <strong>Hacé clic para fijar lo resaltado</strong> (útil para scrollear sin perderlo); clic de nuevo o en un espacio vacío para soltar. </div>
+  <svg id="chart-A"></svg>
+</div>
+<div class="tab-content" id="tab-B">
+  <div class="tab-intro" data-i18n="intro_B">Cooperaciones Técnicas. Su alineación, cuando existe, es de alcance acotado.</div>
+  <svg id="chart-B"></svg>
+</div>
+<div class="tab-content" id="tab-resumen">
+  <div class="resumen-actions">
+    <button class="loadbtn" onclick="descargarResumenCSV()">⬇ Descargar tabla (CSV para Excel)</button>
+    <button class="loadbtn secundario" onclick="copiarResumen()">📋 Copiar tabla</button>
+    <span id="copystatus" style="font-size:12px;color:var(--muted);font-style:italic;"></span>
+  </div>
+  <div class="align-table-wrap" id="resumen-table-wrap"></div>
+  <h2 style="margin:26px 36px 0;font-size:14.5px;font-weight:600;color:var(--ink);">Operaciones sin alineación con la estrategia</h2>
+  <div class="tab-intro" data-i18n="intro_noalin">Operaciones cuya clasificación no arrojó ninguna vinculación con un Resultado Esperado de la estrategia (todas sus filas con conexión lógica = NO).</div>
+  <div class="align-table-wrap" id="noalin-table-wrap"></div>
+</div>
+<div class="tab-content" id="tab-agregada">
+  <div class="resumen-actions">
+    <button class="loadbtn" onclick="descargarAgregadaCSV()">⬇ Descargar (CSV para Excel)</button>
+    <button class="loadbtn secundario" onclick="copiarTabla('#agregada-table-wrap table','copystatus2')">📋 Copiar tabla</button>
+    <span id="copystatus2" style="font-size:12px;color:var(--muted);font-style:italic;"></span>
+  </div>
+  <div class="tab-intro" data-i18n="intro_agregada">Calificación de cada Resultado Esperado según sus operaciones alineadas: <strong>Fuerte</strong> si las operaciones de alineación fuerte son mayoría o hay empate (una fuerte y una débil cuenta como Fuerte); <strong>Débil</strong> si predominan las de alineación débil; <strong>Sin cobertura</strong> si no hay operaciones alineadas. El objetivo de la estrategia se considera <strong>fuerte cuando al menos uno de sus Resultados Esperados es fuerte</strong> (se refleja en las líneas hacia el objetivo). Las Cooperaciones Técnicas no se consideran en esta calificación.</div>
+  <div class="align-table-wrap" id="agregada-table-wrap"></div>
+</div>
+<div class="tab-content" id="tab-tabla">
+  <div class="resumen-actions">
+    <button class="loadbtn secundario" onclick="copiarTabla('#align-table-wrap table','copystatus3')">📋 Copiar tabla</button>
+    <span id="copystatus3" style="font-size:12px;color:var(--muted);font-style:italic;"></span>
+  </div>
+  <div class="align-table-wrap" id="align-table-wrap"></div>
+</div>
+
+<div class="tip" id="tip"></div>
+<footer data-i18n="footer">Fuente: ejercicio de clasificación de alineación de la cartera con los Resultados Esperados de la estrategia de país. RE = Resultado Esperado de la operación (objetivo específico). ER = Resultado Esperado de la estrategia.</footer>
+
+<!-- Inyección desde el flujo (Power Automate reemplaza estos marcadores). Si no se reemplazan, se usan los datos embebidos. -->
+<script type="text/plain" id="estrategia-src">Consolidación una economía ambientalmente responsable|Expandir la cobertura de servicios de saneamiento|Mayor cobertura de servicios de saneamiento
+Consolidación una economía ambientalmente responsable|Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia|Mayor eficiencia del subsector de electricidad
+Consolidación una economía ambientalmente responsable|Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia|Incremento en generación de energía renovable no convencional
+Consolidación una economía ambientalmente responsable|Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia|Menor dependencia a combustibles fósiles
+Promoción de la productividad, la diversificación económica y la integración regional|Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación|Mayor participación de mujeres en liderazgo de empresas
+Promoción de la productividad, la diversificación económica y la integración regional|Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación|Menor brecha de capital humano
+Promoción de la productividad, la diversificación económica y la integración regional|Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación|Mayor asignación de crédito para actividades no tradicionales
+Promoción de la productividad, la diversificación económica y la integración regional|Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación|Mayor asignación de crédito para MiPymes
+Promoción de la productividad, la diversificación económica y la integración regional|Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación|Mayor asignación de crédito para firmas exportadoras
+Promoción de la productividad, la diversificación económica y la integración regional|Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación|Mayor adopción de tecnologías e innovación
+Promoción de la productividad, la diversificación económica y la integración regional|Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación|Mayor resiliencia del sector productivo al cambio climático
+Promoción de la productividad, la diversificación económica y la integración regional|Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo|Mayor cobertura de infraestructura de transporte terrestre
+Promoción de la productividad, la diversificación económica y la integración regional|Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo|Infraestructura de transporte terrestre más resiliente
+Promoción de la productividad, la diversificación económica y la integración regional|Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo|Mayor interoperabilidad de servicios de comercio internacional
+Fortalecimiento de servicios sociales|Fortalecer el acceso y la gestión del sistema de salud|Mayor cobertura de servicios hospitalarios
+Fortalecimiento de servicios sociales|Fortalecer el acceso y la gestión del sistema de salud|Mejor gerenciamiento del sistema de salud
+Fortalecimiento de servicios sociales|Reducir los déficits cuantitativos y cualitativos de viviendas sostenibles|Mayor acceso a la vivienda sostenible
+Fortalecimiento de servicios sociales|Reducir los déficits cuantitativos y cualitativos de viviendas sostenibles|Menor brecha en la calidad de vivienda
+Fortalecimiento de servicios sociales|Fomentar la sostenibilidad financiera del sistema de pensiones|Mejora en la gestión de riesgo del sistema público de pensiones
+Fortalecimiento de servicios sociales|Fomentar la sostenibilidad financiera del sistema de pensiones|Mejora en la supervisión de las entidades de pensión</script>
+<script type="text/plain" id="datos-src">nivel, project, oe_id, oe_text, er_slot, logical_connection, related_er, feasibility, alignment, reasoning
+OE,PR-G1005,OE1,Suministro electrico sostenible,SO1,YES,"Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia",Low,Weak,"Under the energy objective, the general objective states 'Asegurar el suministro electrico sostenible', and division INE/ENE confirms the sector; the closest result is 'Mayor eficiencia del subsector de electricidad', which is not directly evidenced by this general statement."
+OP,PR-G1005,,,,YES,"Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia",Low,Weak,"The general objective mentions 'Asegurar el suministro electrico sostenible', aligning at the objective level to the energy objective without evidencing a specific result."
+OE,PR-J0001,OE1,Recompensa basada en resultados del Programa Piloto,SO1,YES,Expandir la cobertura de servicios de saneamiento,Low,Weak,"Bajo el objetivo de saneamiento, las palabras 'recompensa basada en resultados asociada al Programa Piloto BID CLIMA' y la division INE/WSA orientan al sector; la RE más cercana es 'Mayor cobertura de servicios de saneamiento', pero una recompensa no evidencia por sí sola expansión de cobertura."
+OP,PR-J0001,,,,YES,Expandir la cobertura de servicios de saneamiento,Low,Weak,"La operación se vincula de forma general al objetivo de saneamiento con base en la división y el objetivo general, sin evidenciar una RE específica."
+OE,PR-L1082,OE1,Mejorar viviendas de bajos ingresos en el AMA,ER1,YES,Menor brecha en la calidad de vivienda,High,Strong,"Under the housing objective (SO 6), this OE directly targets improving and expanding existing dwellings, which reduces the qualitative housing deficit measured by RE 6.2."
+OE,PR-L1082,OE2,Mejoramiento integral en La Chacarita Alta,ER1,YES,Mayor cobertura de servicios de saneamiento,High,Strong,"Under the sanitation objective (SO 1), the OE includes intra-domiciliary connections to functioning sewer networks, which evidences increased sanitation coverage (RE 1.1)."
+OE,PR-L1082,OE2,Mejoramiento integral en La Chacarita Alta,ER2,YES,Menor brecha en la calidad de vivienda,High,Strong,"Under the housing objective (SO 6), improving housing conditions in the neighborhood contributes to reducing the qualitative housing deficit (RE 6.2)."
+OE,PR-L1082,OE3,Eficiencia y transparencia en subsidios MUVH,SO1,YES,Reducir los déficits cuantitativos y cualitativos de viviendas sostenibles,Low,Weak,"The MUVH is a public housing entity and strengthening its subsidy processes acts upon the housing sector (SO 6); the closest RE is 6.1 on access, but this OE focuses on targeting, regulations and processing times rather than coverage."
+OP,PR-L1082,,,,YES,Menor brecha en la calidad de vivienda,High,Strong,"Multiple specific objectives improve housing conditions, contributing strongly to reducing the qualitative housing deficit (SO 6, RE 6.2)."
+OP,PR-L1082,,,,YES,Mayor cobertura de servicios de saneamiento,High,Strong,"The neighborhood upgrading includes household sewer connections, evidencing increased sanitation coverage (SO 1, RE 1.1)."
+OP,PR-L1082,,,,YES,Reducir los déficits cuantitativos y cualitativos de viviendas sostenibles,Low,Weak,Institutional improvements in MUVH’s subsidy processes connect at the objective level to the housing objective without evidencing a specific result.
+OE,PR-L1092,OE1,Reduccion de costos y calidad de infraestructura vial en la Region Oriental,SO1,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",Low,Weak,"Pertenece al objetivo de transporte; el RE más cercano es 'Infraestructura de transporte terrestre más resiliente', pero el OE se centra en costos y calidad sin evidenciar directamente resiliencia ni cobertura."
+OE,PR-L1092,OE2,Mejorar conectividad y acceso en tramos intervenidos de la Region Oriental,ER1,YES,Infraestructura de transporte terrestre más resiliente,High,Strong,Bajo el objetivo de transporte; el OE busca mejorar conectividad y acceso y su indicador de porcentaje de días transitables evidencia mayor resiliencia de la infraestructura.
+OE,PR-L1092,OE3,Inclusion laboral local y empleo femenino en obras,,NO,None,None,None,"Ningun resultado listado mide inclusion laboral o empleo femenino en obras, por lo que no corresponde a los resultados del objetivo de transporte ni de otros objetivos disponibles."
+OP,PR-L1092,,,,YES,Infraestructura de transporte terrestre más resiliente,High,Strong,Un OE alinea fuertemente con este resultado mediante el aumento de días transitables en los tramos intervenidos.
+OE,PR-L1094,OE1,Cobertura de agua potable ampliada,,NO,None,None,None,No result in the strategy covers water supply and the sanitation objective does not apply to this OE.
+OE,PR-L1094,OE2,Servicio de agua potable mejorado,,NO,None,None,None,"No listed result matches improvements to potable water service quality, and the sanitation objective does not cover water supply."
+OE,PR-L1094,OE3,Cobertura de saneamiento ampliada,ER1,YES,Mayor cobertura de servicios de saneamiento,High,Strong,"Under the objective to expand coverage of sanitation services, this OE explicitly expands sanitation coverage as measured by new connections and treated wastewater."
+OE,PR-L1094,OE4,Sostenibilidad financiera de prestadores,SO1,YES,Expandir la cobertura de servicios de saneamiento,Low,Weak,"Acts upon sanitation service provision by strengthening provider finances; the closest result is 'Mayor cobertura de servicios de saneamiento', which financial sustainability alone does not directly deliver."
+OP,PR-L1094,,,,YES,Mayor cobertura de servicios de saneamiento,High,Strong,At least one specific objective aligns strongly with expanding sanitation coverage.
+OE,PR-L1097,OE1,Innovaciones pedagogicas para jornada extendida,,NO,None,None,None,"Ningun resultado u objetivo sectorial listado en la estrategia (saneamiento, energia, negocios, transporte, salud, vivienda, pensiones) mide aprendizaje o jornada escolar, por lo que no hay evidencia de alineacion."
+OE,PR-L1097,OE2,Herramientas de gestion escolar,,NO,None,None,None,"Ningun resultado u objetivo sectorial listado en la estrategia cubre la gestion de instituciones educativas, por lo que no hay evidencia de alineacion."
+OE,PR-L1097,OE3,Evidencia y pilotos de transporte escolar en zonas rurales,SO1,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",Low,Weak,"Actua sobre servicios de transporte de estudiantes; el RE mas cercano es 'Mayor cobertura de infraestructura de transporte terrestre', pero generar evidencia y pilotos no expanden la cobertura de infraestructura."
+OE,PR-L1097,OE4,Resultados de impacto en aprendizajes,,NO,None,None,None,"Los resultados listados no incluyen objetivos o resultados sobre aprendizaje educativo, por lo que no hay evidencia de alineacion."
+OP,PR-L1097,,,,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",Low,Weak,"Un objetivo especifico se conecta de forma general con el objetivo de transporte al actuar sobre transporte escolar, sin evidenciar un resultado especifico."
+OE,PR-L1105,OE1,Mejorar transitabilidad y seguridad vial en tramos intervenidos,SO1,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",Low,Weak,"Under the transport objective, the OE improves service level, travel times and safety through rehabilitation and maintenance of road segments, but the nearest RE on coverage (mayor cobertura de infraestructura de transporte terrestre) is not evidenced because no network expansion is stated."
+OP,PR-L1105,,,,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",Low,Weak,"The operation acts upon road infrastructure but does not evidence any specific transport result, so it aligns only at the objective level."
+OE,PR-L1139,OE1,SDE para la Exportacion,SO1,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",Low,Weak,"Under the business environment objective, this OE expands exportable supply and markets; the closest result is 'Mayor asignación de crédito para actividades no tradicionales' and 'Mayor asignación de crédito para firmas exportadoras', but it does not address credit allocation, focusing instead on export development services and promotion."
+OE,PR-L1139,OE2,Capacidades en inteligencia y promocion comercial,SO1,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",Low,Weak,"Under the business environment objective, this OE strengthens management and market intelligence for trade promotion; the closest result is 'Mayor adopción de tecnologías e innovación', but it targets agency capacity rather than firm-level technology adoption."
+OE,PR-L1139,OE3,Oferta exportable en la zona de frontera,ER1,YES,Menor brecha de capital humano,Low,Weak,"Under the business environment objective, training and insertion into formal firms in the border area can reduce human capital gaps, though the OE does not by itself guarantee a measurable reduction at the result level."
+OP,PR-L1139,,,,YES,Menor brecha de capital humano,Low,Weak,"At least one specific objective provides training and fosters insertion into formal firms, contributing to reducing human capital gaps."
+OE,PR-L1145,OE1,Mejora y conservacion de transitabilidad en tramos intervenidos,SO1,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",Low,Weak,"Pertenece al objetivo de transporte: el RE mas cercano es 'Mayor cobertura de infraestructura de transporte terrestre', pero el OE mejora y conserva tramos existentes para reducir tiempos y costos sin expandir la red; tampoco evidencia resiliencia ni interoperabilidad."
+OP,PR-L1145,,,,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",Low,Weak,"La operacion actua sobre infraestructura vial mediante mejoramiento y conservacion, conectando al objetivo de transporte sin evidenciar un RE especifico de cobertura, resiliencia o interoperabilidad."
+OE,PR-L1146,OE1,Financiamiento EE para MiPymes y reduccion de GEI,ER1,YES,Mayor asignación de crédito para MiPymes,High,Strong,"Bajo el objetivo 'Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación', el OE busca 'aumentar el acceso a financiamiento a mediano y largo plazo' para proyectos de EE de MiPymes, lo que evidencia mayor asignación de crédito para MiPymes."
+OP,PR-L1146,,,,YES,Mayor asignación de crédito para MiPymes,High,Strong,"El OE incrementa el acceso a financiamiento de MiPymes para proyectos de EE, elevando la asignación de crédito para MiPymes bajo el objetivo de ambiente de negocios e inversión privada."
+OE,PR-L1147,OE1,Calidad de informacion estadistica agropecuaria,,NO,None,None,None,"Ningun resultado u objetivo de la estrategia cubre estadistica agropecuaria, por lo que este OE no evidencia alineacion."
+OE,PR-L1147,OE2,Oportunidad y disponibilidad de informacion agropecuaria,,NO,None,None,None,"Ningun resultado u objetivo de la estrategia cubre estadistica agropecuaria, por lo que este OE no evidencia alineacion."
+OE,PR-L1147,OE3,Capacidad institucional para estadisticas agropecuarias,,NO,None,None,None,"Ningun resultado u objetivo de la estrategia cubre estadistica agropecuaria, por lo que este OE no evidencia alineacion."
+OP,PR-L1147,,,,NO,None,None,None,Ningun resultado u objetivo de la estrategia se alinea con los OE centrados en estadistica agropecuaria.
+OE,PR-L1148,OE1,Eficacia de sanidad animal y gestion de riesgos,,NO,None,None,None,"Los objetivos e indicadores tratan de servicios públicos de sanidad animal del sector agropecuario, materia que no está cubierta por ningún objetivo estratégico ni resultado esperado de la estrategia listada, por lo que no hay alineación."
+OE,PR-L1148,OE2,Ampliacion de cobertura de servicios veterinarios,,NO,None,None,None,"La ampliación de la cobertura de servicios veterinarios en el sector agropecuario no corresponde a ningún objetivo estratégico ni resultado esperado disponible en la estrategia, por lo que no hay alineación."
+OP,PR-L1148,,,,NO,None,None,None,"La operación no evidencia resultados ni objetivos estratégicos de la estrategia disponible al tratar temas de sanidad animal y servicios veterinarios del sector agropecuario, no contemplados en ella."
+OE,PR-L1150,OE1,Eficiencia recaudatoria de la SET,,NO,None,None,None,"Ninguno de los objetivos de la estrategia (saneamiento, energía, ambiente de negocios, transporte, salud, vivienda, pensiones) cubre la gestión financiera pública o la administración tributaria, por lo que este OE no evidencia ningún resultado listado."
+OE,PR-L1150,OE2,Ejecucion de gastos prioritarios,,NO,None,None,None,"Ninguno de los objetivos de la estrategia (saneamiento, energía, ambiente de negocios, transporte, salud, vivienda, pensiones) cubre la gestión financiera pública o la ejecución presupuestaria, por lo que este OE no evidencia ningún resultado listado."
+OE,PR-L1150,OE3,Ejecucion de inversion publica municipal,,NO,None,None,None,"Ninguno de los objetivos de la estrategia (saneamiento, energía, ambiente de negocios, transporte, salud, vivienda, pensiones) cubre la gestión financiera pública municipal, por lo que este OE no evidencia ningún resultado listado."
+OE,PR-L1150,OE4,Gestion financiera publica,,NO,None,None,None,"Ninguno de los objetivos de la estrategia (saneamiento, energía, ambiente de negocios, transporte, salud, vivienda, pensiones) cubre la gestión financiera pública, por lo que este OE no evidencia ningún resultado listado."
+OP,PR-L1150,,,,NO,None,None,None,La operación no evidencia resultados ni objetivos de la estrategia listados.
+OE,PR-L1152,OE1,Infraestructura urbana sostenible,ER1,YES,Mayor acceso a la vivienda sostenible,High,Strong,"Bajo el objetivo de vivienda (SO 6), el objetivo general menciona 'construcción de viviendas de interés social', lo que habilita mayor acceso a vivienda sostenible para el reasentamiento."
+OE,PR-L1152,OE1,Infraestructura urbana sostenible,ER2,YES,Menor brecha en la calidad de vivienda,Low,Weak,"Bajo el objetivo de vivienda (SO 6), la meta de 'infraestructura urbana de calidad' para el traslado puede contribuir a cerrar brechas de calidad de vivienda aunque el OE no asegura por sí solo la mejora medida."
+OE,PR-L1152,OE2,Infraestructura verde y resiliencia,,NO,None,None,None,"Apunta a recuperación ambiental de lagunas, arroyos y humedales, para lo cual no hay resultados u objetivos correspondientes en la estrategia listada."
+OE,PR-L1152,OE3,Sostenibilidad social e institucional,,NO,None,None,None,"Se orienta a sostenibilidad social e institucional y capacidad adaptativa de las familias, materias sin resultados específicos en los objetivos estratégicos provistos."
+OP,PR-L1152,,,,YES,Mayor acceso a la vivienda sostenible,High,Strong,Al menos un OE se alinea fuertemente con el resultado de acceso a vivienda sostenible bajo el objetivo de vivienda (SO 6).
+OP,PR-L1152,,,,YES,Menor brecha en la calidad de vivienda,Low,Weak,Un OE contribuye débilmente a reducir brechas de calidad de vivienda bajo el objetivo de vivienda (SO 6).
+OE,PR-L1153,OE1,Disminucion de costos transaccionales de servicios publicos,SO1,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",Low,Weak,"Bajo el objetivo de mejorar el ambiente de negocios, el OE reduce costos de tramites como abrir empresas; el RE mas cercano es 'Mayor adopción de tecnologías e innovación', pero la digitalización de procedimientos no evidencia directamente esa adopción."
+OE,PR-L1153,OE2,Mayor uso de TIC por parte de las empresas,ER1,YES,Mayor adopción de tecnologías e innovación,High,Strong,"Bajo el objetivo de mejorar el ambiente de negocios, el OE apunta directamente a que las empresas adopten tecnologías, coincidiendo con el resultado de mayor adopción de tecnologías e innovación."
+OE,PR-L1153,OE3,Mas usuarios conectados a banda ancha de mayor calidad,ER1,YES,Mayor adopción de tecnologías e innovación,Low,Weak,"Bajo el objetivo de mejorar el ambiente de negocios, la mayor conectividad habilita la adopción de tecnologías, pero por sí sola no asegura que las empresas las adopten."
+OE,PR-L1153,OE4,Fortalecimiento institucional para la agenda digital,SO1,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",Low,Weak,"MITIC es un ministerio público transversal; bajo el objetivo de mejorar el ambiente de negocios, el RE más cercano es 'Mayor adopción de tecnologías e innovación', pero fortalecer la capacidad institucional no mide directamente esa adopción."
+OP,PR-L1153,,,,YES,Mayor adopción de tecnologías e innovación,High,Strong,Al menos un objetivo específico se alinea de forma fuerte y suficiente con este resultado del objetivo de mejorar el ambiente de negocios.
+OE,PR-L1156,OE1,Extension de vida util Acaray,SO1,YES,"Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia",Low,Weak,"Under the energy objective, the nearest result is 'Mayor eficiencia del subsector de electricidad', but extending the plant's life does not by itself evidence a measurable increase in efficiency."
+OE,PR-L1156,OE2,Mejorar disponibilidad y confiabilidad Acaray,SO1,YES,"Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia",Low,Weak,"Under the energy objective, the nearest result is 'Mayor eficiencia del subsector de electricidad', but improving availability and reliability is not directly captured by that efficiency result."
+OE,PR-L1156,OE3,Incrementar capacidad de generación Acaray,ER1,YES,Menor dependencia a combustibles fósiles,Low,Weak,"Under the energy objective, increasing hydro generation capacity can substitute fossil-based generation, contributing to lower dependence on fossil fuels."
+OP,PR-L1156,,,,YES,Menor dependencia a combustibles fósiles,Low,Weak,At least one specific objective can reduce reliance on fossil fuels by increasing hydro generation capacity.
+OE,PR-L1157,OE1,Participacion de CHA en instituciones publicas y privadas,ER1,YES,Menor brecha de capital humano,High,Strong,"Bajo el objetivo de mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación, el OE1 busca aumentar la presencia de capital humano avanzado en instituciones públicas y privadas, lo que incide directamente en reducir la brecha de capital humano (apoyado por indicadores de participación de posgraduados)."
+OE,PR-L1157,OE2,Sostenibilidad del programa de becas de postgrado,ER1,YES,Menor brecha de capital humano,Low,Weak,"Bajo el objetivo de mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación, fortalecer la sostenibilidad del programa de becas es instrumental para asegurar la formación continua de capital humano avanzado, aunque por sí solo no garantiza una reducción observable de la brecha de capital humano."
+OP,PR-L1157,,,,YES,Menor brecha de capital humano,High,Strong,"Al menos un OE se alinea de forma fuerte y factible con la reducción de la brecha de capital humano bajo el objetivo de ambiente de negocios, inversión privada e innovación."
+OE,PR-L1162,OE1,"Fortalecer planificacion, seguimiento y evaluacion",,NO,None,None,None,"No result under the strategy is evidenced: strengthening project planning, monitoring and evaluation within a public agricultural institute does not correspond to the listed results of any objective."
+OE,PR-L1162,OE2,Aumentar investigadores especializados,ER1,YES,Menor brecha de capital humano,Low,Weak,"Under the objective of mejorar el ambiente de negocios, impulsar la inversion privada, y fomentar la innovacion, increasing specialized researchers contributes to narrowing the human capital gap but does not ensure it on its own."
+OE,PR-L1162,OE3,Mediciones de GEI y carbono por el IPTA,ER1,YES,Mayor resiliencia del sector productivo al cambio climático,Low,Weak,"Under the objective of mejorar el ambiente de negocios, impulsar la inversion privada, y fomentar la innovacion, conducting GHG and carbon capture measurements in a public agricultural institute informs climate action but alone cannot deliver resilience in the productive sector."
+OE,PR-L1162,OE4,Publicaciones indexadas del IPTA,,NO,None,None,None,"No result is evidenced: generating indexed scientific publications does not map directly to adoption, resilience, or other listed results under the business and innovation objective."
+OE,PR-L1162,OE5,Validar tecnologias agro para adaptacion/mitigacion,ER1,YES,Mayor resiliencia del sector productivo al cambio climático,Low,Weak,"Under the objective of mejorar el ambiente de negocios, impulsar la inversion privada, y fomentar la innovacion, validating agro-technologies for adaptation and emissions reduction supports resilience but validation alone does not ensure it."
+OP,PR-L1162,,,,YES,Menor brecha de capital humano,Low,Weak,At least one specific objective contributes to narrowing the human capital gap under the business and innovation objective.
+OP,PR-L1162,,,,YES,Mayor resiliencia del sector productivo al cambio climático,Low,Weak,At least one specific objective supports resilience of the productive sector to climate change under the business and innovation objective.
+OE,PR-L1164,OE1,Mejora y conservacion de caminos productivos,SO1,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",Low,Weak,"Under the transport objective, the OE improves and maintains productive roads to reduce travel time and costs, with the closest result being 'Infraestructura de transporte terrestre mas resiliente' (RE 4.2), which is not explicitly targeted or measured by the OE or its indicators."
+OP,PR-L1164,,,,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",Low,Weak,The operation acts upon road infrastructure under the transport objective but does not evidence any of its specific results.
+OE,PR-L1167,OE1,Expansion y fortalecimiento de la red asistencial (RIISS-APS),ER1,YES,Mayor cobertura de servicios hospitalarios,Low,Weak,"Under the health objective, expanding and strengthening the RIISS care network aims to increase access, which is closest to greater coverage of hospital services even if focused on primary care rather than hospitals."
+OE,PR-L1167,OE2,Mejora de la calidad de atencion en lineas priorizadas,ER1,YES,Mejor gerenciamiento del sistema de salud,Low,Weak,"Under the health objective, improving quality in maternal-child, NCD, cancer, HIV and TB lines relates to better management of the health system, although the OE emphasizes service quality rather than system management per se."
+OP,PR-L1167,,,,YES,Mayor cobertura de servicios hospitalarios,Low,Weak,"One specific objective targets expanded access to care, closest to greater coverage of hospital services."
+OP,PR-L1167,,,,YES,Mejor gerenciamiento del sistema de salud,Low,Weak,"One specific objective targets improved quality in prioritized care lines, closest to better management of the health system."
+OE,PR-L1170,OE1,Acceso a credito agropecuario para incorporar tecnologia,ER1,YES,Mayor adopcion de tecnologias e innovacion,Low,Weak,"Bajo el objetivo de 'Mejorar el ambiente de negocios, impulsar la inversion privada, y fomentar la innovacion', el OE busca financiar a subprestatarios para incorporar tecnologias, lo que se relaciona con la adopcion de tecnologias e innovacion aunque el acceso a credito por si solo no garantiza su adopcion."
+OP,PR-L1170,,,,YES,Mayor adopcion de tecnologias e innovacion,Low,Weak,"El conjunto de la operacion promueve financiamiento para incorporar tecnologias, conectando debilmente con la adopcion de tecnologias e innovacion."
+OE,PR-L1172,OE1,Ampliar cobertura de alcantarillado en Lambaré,ER1,YES,Mayor cobertura de servicios de saneamiento,High,Strong,"Under SO 1. Expandir la cobertura de servicios de saneamiento, this OE explicitly amplía la cobertura de alcantarillado, which directly matches the result on greater sanitation service coverage."
+OE,PR-L1172,OE2,Tratamiento y disposición adecuada de efluentes,ER1,YES,Mayor cobertura de servicios de saneamiento,Low,Weak,Under SO 1. Expandir la cobertura de servicios de saneamiento; treating and properly disposing wastewater increases effective sanitation service coverage in the area but does not by itself ensure access expansion.
+OE,PR-L1172,OE3,Eficiencia operativa y financiera del servicio de agua potable,SO1,YES,Expandir la cobertura de servicios de saneamiento,Low,Weak,"Acts upon water and sanitation services under SO 1; the nearest result is 'Mayor cobertura de servicios de saneamiento', which efficiency improvements do not move by themselves."
+OE,PR-L1172,OE4,Capacidades institucionales con inclusión y género,SO1,YES,Expandir la cobertura de servicios de saneamiento,Low,Weak,"ESSAP is a public water and sanitation utility; strengthening its capacities for inclusive service provision acts upon the sanitation sector under SO 1, but the closest result 'Mayor cobertura de servicios de saneamiento' is not directly evidenced."
+OE,PR-L1172,OE5,Reducción de GEI del sector AyS,,NO,None,None,None,"No expected result or objective provided covers climate mitigation in water and sanitation, so this OE does not align with the listed results."
+OP,PR-L1172,,,,YES,Mayor cobertura de servicios de saneamiento,High,Strong,At least one specific objective aligns strongly with this result under SO 1 de saneamiento.
+OE,PR-L1173,OE1,Confiabilidad y eficiencia en transmision en alta tension,ER1,YES,Mayor eficiencia del subsector de electricidad,High,Strong,"Bajo el objetivo de energia 'Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia', el OE apunta a confiabilidad y reducción de pérdidas en transmisión (DEENS y pérdidas), lo que mejora directamente la eficiencia del subsector eléctrico."
+OE,PR-L1173,OE2,Eficiencia energetica en edificios de ANDE y alumbrado publico,ER1,YES,Mayor eficiencia del subsector de electricidad,Low,Weak,"Bajo el objetivo de energia 'Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia', el OE busca ahorros de energía en alumbrado público y edificios de ANDE, contribuyendo a la eficiencia del subsector aunque su efecto agregado puede ser limitado."
+OP,PR-L1173,,,,YES,Mayor eficiencia del subsector de electricidad,High,Strong,"Los dos OEs se alinean al resultado de eficiencia del subsector eléctrico del objetivo de energía, con mejoras en pérdidas de transmisión y ahorros de consumo."
+OE,PR-L1174,OE1,Mejorar nivel de servicio y calidad en PY12,SO1,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",Low,Weak,"Under the transport objective (SO 4), the nearest result is 'Infraestructura de transporte terrestre más resiliente', but improving service level and quality does not by itself evidence resilience outcomes like permanent transitability."
+OE,PR-L1174,OE2,Transitabilidad permanente y segura,ER1,YES,Infraestructura de transporte terrestre más resiliente,High,Strong,"Under the transport objective (SO 4), ensuring permanent and safe transitability and fewer closures directly contributes to more resilient terrestrial transport."
+OP,PR-L1174,,,,YES,Infraestructura de transporte terrestre más resiliente,High,Strong,A specific objective aligns strongly with the transport resilience result.
+OE,PR-L1176,OE1,Calidad y oportunidad de informacion estadistica oficial,,NO,None,None,None,"The OE strengthens the national statistics office DGEEC to improve quality, timeliness, and accessibility of official statistics, which does not evidence any result under sanitation, energy, business environment, transport, health, housing, or pensions in the strategy."
+OP,PR-L1176,,,,NO,None,None,None,No specific objective evidences any result or objective from the strategy.
+OE,PR-L1182,OE1,Integracion internacional via gestion fronteriza,ER1,YES,Mayor interoperabilidad de servicios de comercio internacional,Low,Weak,"Under the transport and cross-border trade objective (SO 4), the words 'gestion fronteriza coordinada' and strengthening 'capacidades de instituciones publicas' indicate better interoperability of trade services, and division PTI/TIN confirms the sector."
+OP,PR-L1182,,,,YES,Mayor interoperabilidad de servicios de comercio internacional,Low,Weak,"The general objective names coordinated border management, which links to interoperability of international trade services under the transport and cross-border trade objective."
+OE,PR-L1183,OE1,Mejora de confiabilidad y eficiencia en transmision AT,ER1,YES,Mayor eficiencia del subsector de electricidad,High,Strong,"Bajo el objetivo de energia (SO 2), el OE y sus indicadores de DEP, FEP y perdidas en transmision evidencian mejoras directas en la eficiencia del subsector electrico."
+OE,PR-L1183,OE2,Optimizacion del sistema de transmision con actualizacion tecnologica,ER1,YES,Mayor eficiencia del subsector de electricidad,High,Strong,"Bajo el objetivo de energia (SO 2), la actualizacion tecnologica del sistema de transmision que reduce tiempos de respuesta contribuye directamente a la eficiencia del subsector electrico."
+OE,PR-L1183,OE3,Equidad de genero y diversidad en el sector electrico,ER1,YES,Mayor participación de mujeres en liderazgo de empresas,Low,Weak,"Bajo el objetivo de ambiente de negocios (SO 3), el impulso a mujeres en posiciones de liderazgo en el sector electrico conecta con la mayor participacion de mujeres en liderazgo de empresas, aunque acotado a un sector especifico."
+OP,PR-L1183,,,,YES,Mayor eficiencia del subsector de electricidad,High,Strong,Los OEs de fortalecimiento y optimizacion de la transmision evidencian mejoras directas en la eficiencia del subsector electrico.
+OP,PR-L1183,,,,YES,Mayor participación de mujeres en liderazgo de empresas,Low,Weak,"El OE de genero y diversidad promueve mayor presencia de mujeres en liderazgo, alineado con este resultado aunque limitado al sector electrico."
+OE,PR-L1188,OE1,Mejora del desempeño logístico e integración comercial,ER1,YES,Mayor interoperabilidad de servicios de comercio internacional,Low,Weak,"Bajo el objetivo de transporte, las palabras 'facilitación del comercio exterior' del objetivo general apuntan a la interoperabilidad de servicios de comercio internacional, y la división INE/TSP confirma el sector."
+OP,PR-L1188,,,,YES,Mayor interoperabilidad de servicios de comercio internacional,Low,Weak,"El objetivo general nombra 'facilitación del comercio exterior', lo que conecta con la interoperabilidad de servicios de comercio internacional bajo el objetivo de transporte."
+OE,PR-L1190,OE1,Capacidad resolutiva en servicios de salud de 2º y 3º nivel,ER1,YES,Mayor cobertura de servicios hospitalarios,High,Strong,"Bajo el objetivo Fortalecer el acceso y la gestión del sistema de salud, el OE aumenta la capacidad y acceso de servicios hospitalarios de segundo y tercer nivel, consistente con mayor cobertura de servicios hospitalarios."
+OE,PR-L1190,OE2,Eficiencia y calidad de procesos asistenciales,ER1,YES,Mejor gerenciamiento del sistema de salud,High,Strong,"Bajo el objetivo Fortalecer el acceso y la gestión del sistema de salud, el OE mejora la eficiencia y calidad de procesos asistenciales y el uso de sistemas y protocolos, lo que evidencia un mejor gerenciamiento del sistema de salud."
+OP,PR-L1190,,,,YES,Mayor cobertura de servicios hospitalarios,High,Strong,Al menos un objetivo específico se alinea fuertemente con la cobertura de servicios hospitalarios.
+OP,PR-L1190,,,,YES,Mejor gerenciamiento del sistema de salud,High,Strong,Al menos un objetivo específico se alinea fuertemente con el gerenciamiento del sistema de salud.
+OE,PR-L1192,OE1,Eficiencia de operaciones de DNIT,,NO,None,None,None,"La DNIT es una entidad pública de tributación y aduanas y el OE se centra en sistematizar procedimientos para mejorar ingresos fiscales, materia no cubierta por los objetivos y resultados listados (saneamiento, energía, negocios/innovación, transporte, salud, vivienda, pensiones), por lo que no se evidencia ningún RE ni SO."
+OP,PR-L1192,,,,NO,None,None,None,Ningún OE evidencia resultados u objetivos de la estrategia vigente.
+OE,PR-L1193,OE1,Mejorar condiciones ambientales y acceso a deuda verde en AyS,SO1,YES,Expandir la cobertura de servicios de saneamiento,Low,Weak,"Under the sanitation objective; the general objective cites 'sector de Agua y Saneamiento (AyS)' and 'mejorar las condiciones ambientales de la cuenca', with division INE/WSA guiding the sector, and the closest result is 'Mayor cobertura de servicios de saneamiento' but coverage is not explicitly stated."
+OP,PR-L1193,,,,YES,Expandir la cobertura de servicios de saneamiento,Low,Weak,"Only the general objective was available; it references the AyS sector and environmental improvement, supporting a general alignment to the sanitation objective without evidencing a specific result."
+OE,PR-L1196,OE1,Competitividad agro y desarrollo rural,ER1,YES,Infraestructura de transporte terrestre más resiliente,Low,Weak,"Bajo el objetivo de transporte (SO 4), las palabras 'mejorar la competitividad del sector agropecuario y el desarrollo económico y social de la población rural' y la guía de la división INE/TSP apuntan a calidad de caminos rurales, lo más cercano a infraestructura terrestre más resiliente."
+OP,PR-L1196,,,,YES,Infraestructura de transporte terrestre más resiliente,Low,Weak,"La alineación se sustenta en el objetivo general citado y la priorización sectorial de INE/TSP, que indican intervención en infraestructura de transporte más resiliente."
+OE,PR-L1200,OE1,Conectividad y acceso y comercio internacional en el CB,SO1,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",Low,Weak,"Bajo el objetivo de transporte, las palabras 'contribuir a la conectividad y al acceso... y facilitar el comercio internacional' evidencian actuación en el sector (division INE/TSP), pero no mencionan la 'cobertura' ni la 'interoperabilidad' del comercio internacional (RE 4.1 y RE 4.3), por lo que se alinea a nivel de objetivo."
+OP,PR-L1200,,,,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",Low,Weak,"El objetivo general alude a 'conectividad... y facilitar el comercio internacional' en el corredor, lo que conecta con el objetivo de transporte de la estrategia aunque sin evidenciar un resultado específico."
+OE,PR-L1203,OE1,Credito productivo para PYMEs industriales,ER1,YES,Mayor asignación de crédito para MiPymes,High,Strong,"Bajo el objetivo 'Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación', las palabras 'expandir el crédito para inversiones productivas de las PYMEs' evidencian directamente mayor asignación de crédito a MiPymes, consistente con la división IFD/CMF."
+OP,PR-L1203,,,,YES,Mayor asignación de crédito para MiPymes,High,Strong,"La operación declara 'expandir el crédito para inversiones productivas de las PYMEs', lo que se corresponde directamente con este resultado del objetivo de ambiente de negocios."
+OE,PR-L1204,OE1,Suministro eléctrico sostenible,SO1,YES,"Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia",Low,Weak,"Bajo el objetivo de energía 'Promover la eficiencia...', división INE/ENE; las palabras 'suministro eléctrico sostenible' actúan sobre el sector pero no especifican generación renovable como en RE 2.2, por lo que aplica solo el nivel de objetivo."
+OP,PR-L1204,,,,YES,"Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia",Low,Weak,"El objetivo general menciona 'suministro eléctrico sostenible', conectando con el objetivo de energía pero sin evidenciar un resultado específico."
+OE,PR-L1205,OE1,Desempeño empresarial mediante la innovación,ER1,YES,Mayor adopción de tecnologías e innovación,Low,Weak,"Bajo el objetivo de mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación, las palabras 'mejora del desempeño de las empresas paraguayas mediante la innovación' apuntan a adopción de tecnologías e innovación, y la división PTI/CTI confirma el sector."
+OP,PR-L1205,,,,YES,Mayor adopción de tecnologías e innovación,Low,Weak,"La operación, guiada por 'mejora del desempeño de las empresas paraguayas mediante la innovación' y la división PTI/CTI, se vincula a la adopción de tecnologías e innovación bajo el objetivo de ambiente de negocios e innovación."
+OE,PR-L1207,OE1,Modernizacion del sector electrico mediante rehabilitacion de ANDE,ER1,YES,Mayor eficiencia del subsector de electricidad,Low,Weak,"Bajo el objetivo energetico, las palabras 'modernizacion del sector electrico' y 'rehabilitacion de infraestructura electrica de la ANDE' apuntan a mejoras de eficiencia, y la division INE/ENE confirma el sector, aunque el objetivo general no garantiza por si solo un cambio medible en eficiencia."
+OP,PR-L1207,,,,YES,Mayor eficiencia del subsector de electricidad,Low,Weak,"El objetivo general alude a 'modernizacion del sector electrico' mediante 'rehabilitacion de infraestructura electrica de la ANDE', lo que conecta debilmente con la eficiencia en el subsector electrico."
+OE,PR-L1209,OE1,Incrementar productividad en instituciones P-A-P,SO1,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",Low,Weak,"With only the general objective, the words 'incrementar la productividad' and division PTI/CTI point to the business environment and innovation objective; the nearest RE is 'Mayor adopción de tecnologías e innovación', but the objective does not specify adoption or innovation mechanisms."
+OP,PR-L1209,,,,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",Low,Weak,"The general objective mentions 'incrementar la productividad' and the managing division indicates an innovation focus, connecting at the objective level without evidencing a specific result."
+OE,PR-T1249,OE1,Acceso a instrumentos para inversiones de EE en PYMES,ER1,YES,Mayor asignación de crédito para MiPymes,,,"Under the business environment objective, the OE seeks to improve access to financial and non-financial instruments for SMEs through LFIs to increase EE investments, which would raise credit allocation to MiPymes."
+OE,PR-T1249,OE1,Acceso a instrumentos para inversiones de EE en PYMES,ER2,YES,Mayor eficiencia del subsector de electricidad,,,"Under the energy objective, increasing EE investments by SMEs would reduce electricity consumption on the demand side and thereby contribute to efficiency of the electricity subsector, though the linkage is indirect."
+OP,PR-T1249,,,,YES,Mayor asignación de crédito para MiPymes,,,"At least one specific objective directly increases access to finance for SMEs, raising credit allocation to MiPymes."
+OP,PR-T1249,,,,YES,Mayor eficiencia del subsector de electricidad,,,The operation promotes SME EE investments that can indirectly improve efficiency of the electricity subsector on the demand side.
+OE,PR-T1286,OE1,National ICT Plan designed,ER1,YES,Mayor adopción de tecnologías e innovación,,,"Under the business-environment and innovation objective, designing a national ICT plan supports economy-wide digitalization and technological adoption, which this result measures."
+OP,PR-T1286,,,,YES,Mayor adopción de tecnologías e innovación,,,The TC delivers a national ICT plan that connects to increased adoption of technologies and innovation under the business-environment objective.
+OE,PR-T1295,OE1,Implementacion de sistema de gestion de recursos hidricos,,NO,None,,,"La OE se centra en gestion integrada de recursos hidricos (HydroBID, sistemas de informacion y planificacion) y ninguna RE listada cubre este ambito ni mas que la cobertura de saneamiento, por lo que no hay evidencia de alineacion."
+OP,PR-T1295,,,,NO,None,,,La operacion no evidencia resultados u objetivos de la estrategia con la informacion disponible de gestion de recursos hidricos.
+OE,PR-T1300,OE1,Piloto de aprendizaje con sector privado,ER1,YES,Menor brecha de capital humano,,,"Bajo el objetivo de mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación, el piloto de aprendizaje con apoyo del sector privado fortalece habilidades laborales y contribuye a cerrar la brecha de capital humano."
+OP,PR-T1300,,,,YES,Menor brecha de capital humano,,,La operación conecta con este resultado al implementar un piloto de aprendizaje que fortalece habilidades laborales y reduce la brecha de capital humano.
+OE,PR-T1307,OE1,Estrategia por fases para provisión sostenible de AyS en el AMA,SO1,YES,Expandir la cobertura de servicios de saneamiento,,,"Under the water and sanitation objective; the closest result is 'Mayor cobertura de servicios de saneamiento', but a planning strategy for service provision does not by itself evidence an increase in coverage."
+OE,PR-T1307,OE2,Refuerzo institucional para gestión sostenible de AyS,SO1,YES,Expandir la cobertura de servicios de saneamiento,,,"Under the water and sanitation objective; the closest result is 'Mayor cobertura de servicios de saneamiento', but strengthening sector institutions does not itself produce measurable increases in coverage."
+OE,PR-T1307,OE3,Mejora de la gestión de servicios de AyS en el AMA,SO1,YES,Expandir la cobertura de servicios de saneamiento,,,"Under the water and sanitation objective; the closest result is 'Mayor cobertura de servicios de saneamiento', but management improvements alone do not directly increase coverage."
+OP,PR-T1307,,,,YES,Expandir la cobertura de servicios de saneamiento,,,The specific objectives act upon water and sanitation services under this objective without evidencing a specific measurable result.
+OE,PR-T1320,OE1,Promocion de hidrogeno verde,ER1,YES,Incremento en generación de energía renovable no convencional,,,"Bajo el objetivo 'Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia', la estrategia nacional y el piloto de hidrógeno verde apoyan la diversificación mediante fuentes renovables no convencionales."
+OE,PR-T1320,OE1,Promocion de hidrogeno verde,ER2,YES,Menor dependencia a combustibles fósiles,,,"Bajo el objetivo 'Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia', promover el hidrógeno verde como sustituto energético contribuye a reducir la dependencia de combustibles fósiles."
+OP,PR-T1320,,,,YES,Incremento en generación de energía renovable no convencional,,,La operación conecta con este resultado al promover una estrategia y piloto de hidrógeno verde para diversificar la matriz con renovables no convencionales.
+OP,PR-T1320,,,,YES,Menor dependencia a combustibles fósiles,,,La operación conecta con este resultado al impulsar el hidrógeno verde como alternativa a combustibles fósiles.
+OE,PR-T1324,OE1,Preinversion y planificacion vial,SO1,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",,,"Bajo el objetivo de transporte, el OE actua sobre la red vial fortaleciendo preinversion y planificacion en el MOPC (entidad publica), y el RE mas cercano es 'Mayor cobertura de infraestructura de transporte terrestre', pero estudios y planificacion por si solos no expanden cobertura."
+OP,PR-T1324,,,,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",,,"La CT se vincula a este objetivo de transporte mediante estudios de preinversion y planificacion, sin evidenciar un resultado especifico."
+OE,PR-T1325,OE1,Capacidades tecnicas del Ministerio de Hacienda,,NO,None,,,"The OE strengthens the Ministry of Finance for fiscal policy and management, which is not covered by any objective or result in the provided strategy list."
+OP,PR-T1325,,,,NO,None,,,No expected result or strategic objective in the list matches strengthening the Ministry of Finance for fiscal policy and management.
+OE,PR-T1327,OE1,Tourism demand and services supply studies prepared,,NO,None,,,"This OE focuses on preparatory studies for domestic tourism investments, which are not covered by the listed results in sanitation, energy, business environment, transport, health, housing, or pensions."
+OE,PR-T1327,OE2,Investments in tourism sites approved,,NO,None,,,"This OE targets approval and design for tourism sites, which do not correspond to any expected result under the available objectives (sanitation, energy, business environment, transport, health, housing, or pensions)."
+OP,PR-T1327,,,,NO,None,,,"No expected result or sectoral objective provided relates to tourism investments or preparatory studies, so the operation does not align to the listed targets."
+OE,PR-T1328,OE1,Capacidades para adaptación en generación hidroeléctrica,ER1,YES,Mayor resiliencia del sector productivo al cambio climático,,,"Bajo el objetivo de mejorar el ambiente de negocios e innovación (SO 3), la OE elabora e implementa un plan de adaptación del subsector hidroeléctrico, lo que apunta a mayor resiliencia del sector productivo al cambio climático."
+OE,PR-T1328,OE1,Capacidades para adaptación en generación hidroeléctrica,SO1,YES,"Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia",,,"Actúa sobre el sector energético (SO 2); el RE más cercano es 'Mayor eficiencia del subsector de electricidad', pero un plan de adaptación y fortalecimiento de capacidades no garantiza por sí mismo mejoras de eficiencia."
+OP,PR-T1328,,,,YES,Mayor resiliencia del sector productivo al cambio climático,,,La CT conecta con este resultado mediante el plan de adaptación del subsector hidroeléctrico.
+OP,PR-T1328,,,,YES,"Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia",,,"La CT actúa sobre el sector eléctrico sin evidenciar un RE específico de ese objetivo, por lo que se alinea a nivel de objetivo."
+OE,PR-T1329,OE1,Nuevas oportunidades de financiamiento de la politica de innovacion,SO1,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,"Bajo el objetivo de ambiente de negocios e innovación, la OE financia la política de innovación; el RE más cercano es 'Mayor adopción de tecnologías e innovación', pero la acción se limita a instrumentos de financiamiento de política y no evidencia adopción directa."
+OE,PR-T1329,OE2,Formacion de capital humano para la gestion de politicas de innovacion,SO1,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,"Bajo el objetivo de ambiente de negocios e innovación, la OE forma capital humano para gestionar políticas; el RE más cercano es 'Menor brecha de capital humano', pero la formación se enfoca en gestores del sistema de innovación y no evidencia una reducción general de esa brecha."
+OP,PR-T1329,,,,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,"Las OE se orientan a la política de innovación, conectando al objetivo de ambiente de negocios e innovación sin evidenciar un resultado específico."
+OE,PR-T1330,OE1,Fortalecimiento de la gestion del MSPBS para reducir mortalidad materna,ER1,YES,Mejor gerenciamiento del sistema de salud,,,"Bajo el objetivo de Fortalecer el acceso y la gestión del sistema de salud, el MSPBS es una entidad pública y su fortalecimiento en gestión de calidad y capacidades digitales evidencia una mejora en la gestión del sistema de salud."
+OP,PR-T1330,,,,YES,Mejor gerenciamiento del sistema de salud,,,"La cooperacion tecnica fortalece la gestion de calidad y las capacidades digitales del MSPBS, lo que se alinea con la mejora en la gestion del sistema de salud."
+OE,PR-T1331,OE1,Rediseño de VUCE y VUI y eficiencia procedimental,ER1,YES,Mayor interoperabilidad de servicios de comercio internacional,,,"Bajo el objetivo de transporte y comercio transfronterizo, el apoyo a la VUCE/VUI y a la facilitación aduanera evidencia la interoperabilidad de servicios de comercio internacional."
+OP,PR-T1331,,,,YES,Mayor interoperabilidad de servicios de comercio internacional,,,"La cooperación técnica se orienta a rediseñar ventanillas únicas y facilitar trámites, lo que contribuye a la interoperabilidad de servicios de comercio internacional."
+OE,PR-T1338,OE1,Integracion de accion climatica en politica y gestion fiscal,,NO,None,,,"The OE strengthens fiscal policy and management of the Ministry of Finance (a whole-of-government public entity), which is not covered by any Strategic Objective or Expected Result in the list."
+OP,PR-T1338,,,,NO,None,,,The operation does not evidence any of the listed results or objectives.
+OE,PR-T1339,OE1,Generar información sobre mujeres en el mercado laboral,SO1,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,"Bajo el objetivo de negocios e innovación (SO 3), el RE más cercano es 'Menor brecha de capital humano', pero generar información por sí solo no reduce dicha brecha ni evidencia ese resultado específico."
+OE,PR-T1339,OE2,Analizar políticas para promover inserción laboral de mujeres en empleos de calidad,SO1,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,"Bajo el objetivo de negocios e innovación (SO 3), el RE más cercano es 'Menor brecha de capital humano', pero el análisis de políticas no garantiza por sí mismo una reducción de esa brecha ni evidencia un resultado específico."
+OP,PR-T1339,,,,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,"Las OEs se conectan al objetivo de negocios e innovación a un nivel general, sin evidenciar resultados específicos bajo ese objetivo."
+OE,PR-T1340,OE1,Centros de valorizacion de residuos de poda urbana operativos,ER1,YES,Incremento en generación de energía renovable no convencional,,,"Bajo el objetivo de energia (SO 2. Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia), establecer centros que produzcan un combustible renovable a partir de residuos urbanos contribuye a aumentar la generación de energía renovable no convencional."
+OE,PR-T1340,OE1,Centros de valorizacion de residuos de poda urbana operativos,ER2,YES,Menor dependencia a combustibles fósiles,,,"Bajo el objetivo de energia (SO 2. Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia), producir un combustible renovable alternativo a partir de residuos reduce la dependencia de combustibles fósiles."
+OP,PR-T1340,,,,YES,Incremento en generación de energía renovable no convencional,,,La operacion contribuye a este resultado al establecer centros que convierten residuos de poda en un combustible renovable.
+OP,PR-T1340,,,,YES,Menor dependencia a combustibles fósiles,,,La produccion de un combustible renovable alternativo a partir de residuos apoya la disminucion de la dependencia de combustibles fósiles bajo el objetivo de energia.
+OE,PR-T1341,OE1,Capacidades del Ministerio de Hacienda para reforma del sector público,,NO,None,,,"La OE actúa sobre la gestión pública del Ministerio de Hacienda y no evidencia ningún resultado ni objetivo sectorial de la estrategia, que se enfoca en saneamiento, energía, negocios e innovación, transporte, salud, vivienda y pensiones."
+OP,PR-T1341,,,,NO,None,,,"La operación se centra en fortalecimiento de la administración pública en el Ministerio de Hacienda, tema no cubierto por los resultados de la estrategia listada."
+OE,PR-T1343,OE1,Planes y proyectos para fortalecer logistica y facilitacion comercial,ER1,YES,Mayor interoperabilidad de servicios de comercio internacional,,,"Bajo el objetivo de transporte y comercio transfronterizo (SO 4), el OE orientado a facilitar el comercio exterior y fortalecer el sector logístico evidencia el resultado sobre interoperabilidad de servicios de comercio internacional."
+OP,PR-T1343,,,,YES,Mayor interoperabilidad de servicios de comercio internacional,,,La CT apoya reformas y estrategias de facilitación del comercio y logística que se relacionan con la interoperabilidad de servicios de comercio internacional del SO 4.
+OE,PR-T1344,OE1,Planificacion energetica integrada,SO1,YES,"Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia",,,"Bajo el objetivo 'Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia', la planificación integrada del sector actúa sobre el sector pero no evidencia por sí misma la RE más cercana 'Mayor eficiencia del subsector de electricidad'."
+OE,PR-T1344,OE2,Estrategias de descarbonizacion y eficiencia energetica,ER1,YES,Mayor eficiencia del subsector de electricidad,,,"Bajo el objetivo 'Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia', la promoción de programas de eficiencia energética en los sectores productivo y residencial se alinea con el aumento de la eficiencia del subsector eléctrico."
+OE,PR-T1344,OE2,Estrategias de descarbonizacion y eficiencia energetica,ER2,YES,Menor dependencia a combustibles fósiles,,,"Bajo el objetivo 'Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia', las estrategias de descarbonización y eficiencia energética contribuyen a reducir el consumo de energía de origen fósil."
+OE,PR-T1344,OE3,Fortalecimiento institucional del VMME,SO1,YES,"Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia",,,"Bajo el objetivo 'Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia', el fortalecimiento institucional y regulatorio del VMME actúa sobre el sector pero no evidencia por sí mismo la RE más cercana 'Mayor eficiencia del subsector de electricidad'."
+OP,PR-T1344,,,,YES,Mayor eficiencia del subsector de electricidad,,,La operación conecta con este resultado mediante la promoción de programas de eficiencia energética en los sectores productivo y residencial.
+OP,PR-T1344,,,,YES,Menor dependencia a combustibles fósiles,,,La operación conecta con este resultado mediante estrategias de descarbonización y eficiencia energética que reducen el uso de combustibles fósiles.
+OE,PR-T1345,OE1,Desarrollo del mercado de deuda y estrategia ESG,SO1,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,"Bajo el objetivo de mejorar el ambiente de negocios, el OE actúa sobre el mercado de capitales soberano; el RE más cercano es 'Mayor asignación de crédito para MiPymes', pero el apoyo se centra en el mercado de títulos públicos y la gestión de deuda del MEF, por lo que no evidencia ese resultado."
+OP,PR-T1345,,,,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,"La operación se conecta de forma general con el objetivo de ambiente de negocios al desarrollar el mercado local de títulos públicos, sin evidenciar un resultado específico."
+OE,PR-T1346,OE1,Diagnostico multidimensional para INFONA,,NO,None,,,"La OE actua sobre la gestion del sector forestal a traves de INFONA (entidad publica), pero ninguna SO/RE listada cubre bosques/recursos naturales ni evidencia resultados en saneamiento, energia, negocios, transporte, salud, vivienda o pensiones, por lo que no hay alineacion."
+OE,PR-T1346,OE2,Herramientas de politica publica sectorial forestal,,NO,None,,,"La OE desarrolla herramientas de politica para el manejo forestal, ambito no contemplado por las SO/RE disponibles (saneamiento, energia, negocios, transporte, salud, vivienda y pensiones), por lo que no se evidencia alineacion."
+OP,PR-T1346,,,,NO,None,,,"La operacion se centra en la gestion y politica del sector forestal (INFONA), un tema no cubierto por los objetivos y resultados de la estrategia listada, por lo que no hay alineacion establecida."
+OE,PR-T1347,OE1,Action Plan C&D,,NO,None,,,"The general objective 'Action Plan C&D' names no sector, service or population, and division CSC/CPR does not disambiguate the sector."
+OP,PR-T1347,,,,NO,None,,,Only the general objective was available and it does not identify what the operation acts upon.
+OE,PR-T1348,OE1,Institutional policy design strengthened,,NO,None,,,"The TC strengthens the Ministry of Finance on public revenue policy (public companies and cadastre), which does not correspond to any listed objective or result (sanitation, energy, business environment, transport, health, housing, or pensions)."
+OP,PR-T1348,,,,NO,None,,,"No expected result or strategic objective provided covers public finance or revenue generation, so the operation does not evidence any listed target."
+OE,PR-T1349,OE1,Transversalizacion de genero y diversidad en operaciones BID,,NO,None,,,"El objetivo trata de transversalizar genero y diversidad en operaciones y no actua sobre los sectores de saneamiento, energia, ambiente de negocios, transporte, salud, vivienda o pensiones definidos en la estrategia, por lo que no evidencia ningun RE ni SO."
+OE,PR-T1349,OE2,Dialogo de politica para inclusion de mujeres y grupos diversos,,NO,None,,,"El objetivo busca apoyar dialogo de politica sobre inclusion de mujeres y grupos diversos pero no interviene en ningun sector u objetivo estrategico listado (saneamiento, energia, ambiente de negocios, transporte, salud, vivienda o pensiones), por lo que no evidencia ningun RE ni SO."
+OP,PR-T1349,,,,NO,None,,,Ninguna de las metas especificas del proyecto se alinea con los resultados u objetivos estrategicos listados en la estrategia pais.
+OE,PR-T1350,OE1,Improvement in basic math skills,ER1,YES,Menor brecha de capital humano,,,"Under the objective Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación, improving basic math skills via tutoring contributes to reducing the human capital gap, though it does not directly address labor-market mismatches so feasibility is low."
+OP,PR-T1350,,,,YES,Menor brecha de capital humano,,,"One specific objective contributes to reducing the human capital gap within the business and innovation objective, but without directly targeting labor-market alignment."
+OE,PR-T1351,OE1,Urban planning instruments with innovative approach,SO1,YES,Reducir los déficits cuantitativos y cualitativos de viviendas sostenibles,,,"Under the housing objective, the OE develops urban planning and metropolitan management tools in the urban/habitat sector, but it does not by itself achieve the nearest results 'Mayor acceso a la vivienda sostenible' or 'Menor brecha en la calidad de vivienda', so the alignment is at the objective level."
+OP,PR-T1351,,,,YES,Reducir los déficits cuantitativos y cualitativos de viviendas sostenibles,,,The operation acts upon the housing/urban sector via urban planning instruments without evidencing a specific housing access or quality result.
+OE,PR-T1352,OE1,Interoperabilidad de datos en salud,ER1,YES,Mejor gerenciamiento del sistema de salud,,,"Bajo el objetivo de salud (SO 5), la consolidación y ampliación de la interoperabilidad de datos y la mayor disponibilidad de información de pacientes fortalecen la gestión del sistema de salud que mide este resultado."
+OE,PR-T1352,OE2,Comunicación y hoja de ruta de salud digital,ER1,YES,Mejor gerenciamiento del sistema de salud,,,"Bajo el objetivo de salud (SO 5), la sistematización y difusión de la agenda de salud digital y la actualización/mantenimiento de la hoja de ruta apoyan la gestión del sistema de salud que mide este resultado."
+OP,PR-T1352,,,,YES,Mejor gerenciamiento del sistema de salud,,,La operación contribuye al objetivo de salud (SO 5) mediante acciones de interoperabilidad y gobernanza digital que apuntalan el gerenciamiento del sistema de salud.
+OE,PR-T1355,OE1,Digital surveillance and data management system nationwide,ER1,YES,Mejor gerenciamiento del sistema de salud,,,"Bajo el objetivo 'Fortalecer el acceso y la gestión del sistema de salud', el OE1 establece un sistema nacional digital de vigilancia y gestión de datos que mejora la gestión del sistema conforme a este resultado."
+OE,PR-T1355,OE2,"Capacidades de prevención, pronóstico y preparación",ER1,YES,Mejor gerenciamiento del sistema de salud,,,"Bajo el objetivo 'Fortalecer el acceso y la gestión del sistema de salud', el OE2 incrementa capacidades de preparación y respuesta en salud pública, lo que constituye un mejor gerenciamiento del sistema según este resultado."
+OP,PR-T1355,,,,YES,Mejor gerenciamiento del sistema de salud,,,"Al menos un OE mejora directamente la gestión del sistema de salud a través de vigilancia y preparación, alineándose fuertemente con este resultado."
+OE,PR-T1356,OE1,Gobernanza de datos y plan de conectividad,,NO,None,,,"The specific objective focuses on digital connectivity and public-sector data governance (CONATEL and the national broadband plan), which is not covered by any Strategic Objective or Expected Result listed."
+OP,PR-T1356,,,,NO,None,,,"The operation targets digital connectivity and public-sector data governance, which are not represented in the listed objectives or results."
+OE,PR-T1358,OE1,Capacidades institucionales fortalecidas,ER1,YES,Mayor adopción de tecnologías e innovación,,,"Bajo el objetivo de mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación, el diseño de políticas y de intervenciones para la digitalización de PYMEs y el aumento de la productividad apunta a impulsar la adopción de tecnologías e innovación."
+OE,PR-T1358,OE1,Capacidades institucionales fortalecidas,ER2,YES,Mayor resiliencia del sector productivo al cambio climático,,,"Bajo el objetivo de mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación, el enfoque en descarbonización y en intervenciones que promueven adaptación y mitigación climática busca aumentar la resiliencia del sector productivo al cambio climático."
+OP,PR-T1358,,,,YES,Mayor adopción de tecnologías e innovación,,,La operación se conecta a este resultado del objetivo de negocios e innovación mediante el diseño de políticas e intervenciones para la digitalización de PYMEs.
+OP,PR-T1358,,,,YES,Mayor resiliencia del sector productivo al cambio climático,,,La operación se vincula a este resultado del objetivo de negocios e innovación por su enfoque en descarbonización y en intervenciones de adaptación y mitigación climática en el sector productivo.
+OE,PR-T1359,OE1,Action Plan C&D,,NO,None,,,"Only the general objective 'Action Plan C&D' was available, which does not identify a sector or service, and division CSC/CPR does not disambiguate the sector."
+OP,PR-T1359,,,,NO,None,,,Only the general objective was available and it does not identify what the operation acts upon.
+OE,PR-T1360,OE1,Fortalecimiento del operador y mejoras planificadas,SO1,YES,Expandir la cobertura de servicios de saneamiento,,,"Pertenece al objetivo de expandir la cobertura de servicios de saneamiento; el resultado más cercano es Mayor cobertura de servicios de saneamiento, pero el fortalecimiento de operadores y la planificación no garantizan por sí solos un aumento de cobertura."
+OE,PR-T1360,OE2,Herramientas de fortalecimiento sectorial implementadas,SO1,YES,Expandir la cobertura de servicios de saneamiento,,,"Pertenece al objetivo de expandir la cobertura de servicios de saneamiento; el resultado más cercano es Mayor cobertura de servicios de saneamiento, pero la implementación de herramientas de fortalecimiento no asegura por sí misma un aumento de cobertura."
+OE,PR-T1360,OE3,Herramientas para estrategias financieras implementadas,SO1,YES,Expandir la cobertura de servicios de saneamiento,,,"Pertenece al objetivo de expandir la cobertura de servicios de saneamiento; el resultado más cercano es Mayor cobertura de servicios de saneamiento, pero las herramientas financieras no implican por sí solas un incremento de cobertura."
+OP,PR-T1360,,,,YES,Expandir la cobertura de servicios de saneamiento,,,"Las OEs actúan sobre el sector de agua y saneamiento sin evidenciar un resultado específico, por lo que la alineación es al objetivo general del sector."
+OE,PR-T1362,OE1,Fortalecimiento institucional de la DNIT,,NO,None,,,"The specific objective strengthens the tax authority DNIT, a whole-of-government public entity, and none of the strategy's results or objectives on sanitation, energy, business climate, transport, health, housing or pensions measure tax administration or public financial management."
+OP,PR-T1362,,,,NO,None,,,"The operation evidences no result or objective in the strategy, as it focuses on strengthening the national tax authority rather than the listed sectors."
+OE,PR-T1363,OE1,Integracion climatica y MRV para inversiones,SO1,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,"Bajo el objetivo de ambiente de negocios; el RE mas cercano es 'Mayor resiliencia del sector productivo al cambio climático', pero la integracion de clima y biodiversidad en la inversion publica y el desarrollo de sistemas de MRV no demuestra por si misma un cambio medible en la resiliencia del sector productivo."
+OP,PR-T1363,,,,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,"La CT actua sobre el ambiente de negocios para inversiones verdes sin evidenciar un resultado especifico, por lo que se alinea a nivel de objetivo."
+OE,PR-T1364,OE1,Analisis de formalizacion de MiPymes,SO1,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,"Bajo el objetivo de ambiente de negocios, el OE actúa sobre la formalización de MiPymes; el RE más cercano es 'Mayor asignación de crédito para MiPymes', pero un análisis de barreras no cambia directamente la asignación de crédito."
+OE,PR-T1364,OE2,Analisis de mejoras de politicas de pensiones,SO1,YES,Fomentar la sostenibilidad financiera del sistema de pensiones,,,"Bajo el objetivo de pensiones, el RE más cercano es 'Mejora en la gestión de riesgo del sistema público de pensiones', pero apoyar con análisis de opciones de política no implica por sí mismo mejoras en la gestión de riesgo o la supervisión."
+OP,PR-T1364,,,,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,El OE sobre estudios de formalización de MiPymes se vincula a este objetivo de manera general sin evidenciar un resultado específico.
+OP,PR-T1364,,,,YES,Fomentar la sostenibilidad financiera del sistema de pensiones,,,El OE de análisis de opciones de política previsional se vincula a este objetivo de manera general sin evidenciar un resultado específico.
+OE,PR-T1365,OE1,Sizing hospital investments,ER1,YES,Mejor gerenciamiento del sistema de salud,,,"Under the health objective (SO 5), preparing a hospital investment plan strengthens planning and management of the health system."
+OE,PR-T1365,OE2,Identify human resources gap and potential improvement measures,ER1,YES,Mejor gerenciamiento del sistema de salud,,,"Under the health objective (SO 5), diagnosing HR gaps and proposing measures improves the management capacity of the health system."
+OP,PR-T1365,,,,YES,Mejor gerenciamiento del sistema de salud,,,Both specific objectives contribute to improving management of the health system through better planning of hospital investments and human resources.
+OE,PR-T1367,OE1,Ecosistema para escalar programas de aceleracion de aprendizajes,ER1,YES,Menor brecha de capital humano,,,"Bajo el objetivo 'Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación', el OE busca escalar programas de aceleración de aprendizajes para cerrar brechas de capital humano, pero un ecosistema y modelo de escalamiento por sí solos no bastan para reducir directamente la brecha medida."
+OP,PR-T1367,,,,YES,Menor brecha de capital humano,,,"La operación apunta a reducir la brecha de capital humano mediante el escalamiento de programas de aceleración de aprendizajes, aunque la evidencia es indirecta."
+OE,PR-T1369,OE1,Acciones e inversiones de gestion de recursos hidricos listas,SO1,YES,Expandir la cobertura de servicios de saneamiento,,,"Under the water and sanitation objective; the nearest result is 'Mayor cobertura de servicios de saneamiento', but preparing actions e inversiones para la gestion sostenible de recursos hidricos no evidencia por si mismo un aumento de cobertura de saneamiento."
+OE,PR-T1369,OE2,Fortalecimiento de capacidad institucional para gobernanza de cuenca,SO1,YES,Expandir la cobertura de servicios de saneamiento,,,"Under the water and sanitation objective; the nearest result is 'Mayor cobertura de servicios de saneamiento', but fortalecer capacidades institucionales en gobernanza de cuenca no mueve directamente la cobertura de servicios de saneamiento."
+OP,PR-T1369,,,,YES,Expandir la cobertura de servicios de saneamiento,,,"Two specific objectives connect to the water and sanitation objective at a general level, without evidencing a specific result."
+OE,PR-T1372,OE1,Estudios y diseños del programa de mejoramiento de viviendas,ER1,YES,Mayor acceso a la vivienda sostenible,,,"Bajo el objetivo de vivienda (SO 6), el OE prepara estudios para un programa orientado a disminuir el déficit cuantitativo de vivienda para hogares de bajos ingresos, lo que se vincula con el acceso a vivienda sostenible."
+OE,PR-T1372,OE1,Estudios y diseños del programa de mejoramiento de viviendas,ER2,YES,Menor brecha en la calidad de vivienda,,,"Bajo el objetivo de vivienda (SO 6), el OE prepara estudios para un programa orientado a disminuir el déficit cualitativo de vivienda para hogares de bajos ingresos, lo que se vincula con la mejora de la calidad de la vivienda."
+OP,PR-T1372,,,,YES,Mayor acceso a la vivienda sostenible,,,El OE conecta con este resultado al preparar estudios para un programa que busca reducir el déficit cuantitativo de vivienda.
+OP,PR-T1372,,,,YES,Menor brecha en la calidad de vivienda,,,El OE conecta con este resultado al preparar estudios para un programa que busca reducir el déficit cualitativo de vivienda.
+OE,PR-T1376,OE1,Adopcion de sistema CRVS,,NO,None,,,La especifica adopcion de un sistema de registro civil y estadisticas vitales para consolidar el registro de poblacion no corresponde a ninguno de los resultados u objetivos estrategicos listados.
+OP,PR-T1376,,,,NO,None,,,La operacion sobre CRVS y registro de poblacion no se alinea con los resultados u objetivos estrategicos disponibles.
+OE,PR-T1378,OE1,Pre-inversion para el Corredor Bioceánico,SO1,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",,,"Bajo el objetivo de transporte, los estudios de ingeniería y socioambientales actúan sobre la infraestructura vial; el RE más cercano es 'Mayor cobertura de infraestructura de transporte terrestre', que los estudios por sí solos no materializan."
+OP,PR-T1378,,,,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",,,"La operación apoya estudios de preinversión para un corredor vial, conectando al nivel de objetivo sin evidenciar un resultado específico."
+OE,PR-T1379,OE1,Aprobacion del PR-L1206 de agua y saneamiento,ER1,YES,Mayor cobertura de servicios de saneamiento,,,"Under the sanitation objective, the OE secures approval of a water and sanitation program for comunidades rurales e indígenas y pequeñas ciudades, which supports expanding sanitation service coverage."
+OP,PR-T1379,,,,YES,Mayor cobertura de servicios de saneamiento,,,The TC aligns via preparation and approval of a water and sanitation program aimed at expanding sanitation coverage.
+OE,PR-T1381,OE1,Implementacion del regimen de integridad y anticorrupcion,,NO,None,,,"La CGR es una entidad publica de control; implementar un regimen de integridad y anticorrupcion no corresponde a ningun resultado ni objetivo estrategico de esta estrategia (saneamiento, energia, negocios, transporte, salud, vivienda o pensiones)."
+OE,PR-T1381,OE2,Fortalecimiento de comunicacion y difusion de resultados de control,,NO,None,,,"La CGR es una entidad publica de control; fortalecer comunicacion y difusion de control no evidencia ningun resultado ni objetivo de los sectores listados en la estrategia (saneamiento, energia, negocios, transporte, salud, vivienda o pensiones)."
+OE,PR-T1381,OE3,Consolidacion de la auditoria de desempeño en la CGR,,NO,None,,,"La CGR es una entidad publica de control; consolidar auditoria de desempeño no se alinea con los resultados u objetivos sectoriales disponibles en la estrategia (saneamiento, energia, negocios, transporte, salud, vivienda o pensiones)."
+OP,PR-T1381,,,,NO,None,,,Ninguna de las especificas sobre fortalecimiento de la CGR se alinea con los resultados u objetivos sectoriales incluidos en la estrategia proporcionada.
+OE,PR-T1382,OE1,Proyectos de energia limpia apoyados con asistencia tecnica,ER1,YES,Incremento en generación de energía renovable no convencional,,,"Bajo el objetivo de energia (SO 2), el objetivo general menciona 'inversión en energía limpia' y el OE apoya proyectos, lo que se conecta con aumentar la generación renovable no convencional."
+OE,PR-T1382,OE1,Proyectos de energia limpia apoyados con asistencia tecnica,ER2,YES,Menor dependencia a combustibles fósiles,,,"Bajo el objetivo de energia (SO 2), al apoyar la preparación y ejecución de inversiones en energía limpia se contribuye a reducir la dependencia de combustibles fósiles."
+OE,PR-T1382,OE2,Fortalecimiento de empresas electricas publicas,ER1,YES,Mayor eficiencia del subsector de electricidad,,,Bajo el objetivo de energia (SO 2); ANDE es una empresa eléctrica pública y su fortalecimiento para optimizar la planificación del sistema eléctrico se orienta a mayor eficiencia del subsector.
+OP,PR-T1382,,,,YES,Incremento en generación de energía renovable no convencional,,,"Las acciones de la operación apoyan inversiones en energía limpia, conectando con el aumento de la generación renovable no convencional."
+OP,PR-T1382,,,,YES,Menor dependencia a combustibles fósiles,,,El apoyo a inversiones en energía limpia se vincula con la reducción de la dependencia de combustibles fósiles.
+OP,PR-T1382,,,,YES,Mayor eficiencia del subsector de electricidad,,,El fortalecimiento de ANDE y la optimización de la planificación del sistema eléctrico se relacionan con la eficiencia del subsector de electricidad.
+OE,PR-T1383,OE1,Strengthened public investment management via SNIP,,NO,None,,,"The OE strengthens the Ministry of Economy and Finance (a public-sector entity) to improve the National Public Investment System, but none of the listed strategic objectives or results cover public administration or public investment management, so no alignment is evidenced."
+OP,PR-T1383,,,,NO,None,,,"The operation focuses on public investment management in the finance ministry, which is not covered by the strategy's objectives or results."
+OE,PR-T1384,OE1,Fortalecimiento del Sistema Nacional de Innovacion,ER1,YES,Mayor adopción de tecnologías e innovación,,,"Bajo el objetivo de mejorar el ambiente de negocios e innovación (SO 3), el objetivo general menciona 'fortalecimiento del capital humano y adopción tecnológica' en MiPymes y el fortalecimiento de CONACYT (entidad pública), lo que impulsa la adopción de tecnologías e innovación."
+OE,PR-T1384,OE1,Fortalecimiento del Sistema Nacional de Innovacion,ER2,YES,Menor brecha de capital humano,,,"Bajo el objetivo de mejorar el ambiente de negocios e innovación (SO 3), el objetivo general alude al 'fortalecimiento del capital humano' para innovación en MiPymes y del ecosistema liderado por CONACYT (entidad pública), lo que contribuye a cerrar brechas de capital humano."
+OP,PR-T1384,,,,YES,Mayor adopción de tecnologías e innovación,,,La operación se alinea a este resultado al promover adopción tecnológica y fortalecer el ecosistema nacional de innovación.
+OP,PR-T1384,,,,YES,Menor brecha de capital humano,,,La operación se alinea a este resultado al fortalecer el capital humano para innovación en MiPymes dentro del objetivo de ambiente de negocios e innovación.
+OE,PR-T1385,OE1,Capacidades del MIC para competitividad metalurgica,SO1,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,"Bajo este objetivo, el OE fortalece al MIC (entidad pública) para la competitividad del sector metalúrgico; el RE más cercano es 'Mayor adopción de tecnologías e innovación', pero un plan y fortalecimiento institucional no evidencian por sí mismos dicha adopción."
+OP,PR-T1385,,,,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,La CT se orienta al objetivo de ambiente de negocios e innovación a nivel general sin evidenciar un resultado específico.
+OE,PR-T1389,OE1,Instrumentos financieros y no financieros para EE en MiPymes,ER1,YES,Mayor asignación de crédito para MiPymes,,,"Under the objective 'Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación', structuring instruments that foster EE investments by SMEs supports greater credit allocation for MiPymes."
+OE,PR-T1389,OE2,Conocimiento sobre beneficios de EE,ER1,YES,Mayor adopción de tecnologías e innovación,,,"Under the objective 'Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación', improving knowledge of EE benefits promotes firms' adoption of technologies and innovation."
+OE,PR-T1389,OE3,Cartera de proyectos EE técnicamente sólidos y bancables,ER1,YES,Mayor asignación de crédito para MiPymes,,,"Under the objective 'Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación', a bankable pipeline of EE projects enables greater SME credit allocation."
+OE,PR-T1389,OE3,Cartera de proyectos EE técnicamente sólidos y bancables,ER2,YES,Mayor adopción de tecnologías e innovación,,,"Under the objective 'Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación', developing EE project pipelines drives adoption of technologies and innovation."
+OP,PR-T1389,,,,YES,Mayor asignación de crédito para MiPymes,,,Multiple specific objectives foster SME lending for EE projects under the business environment objective.
+OP,PR-T1389,,,,YES,Mayor adopción de tecnologías e innovación,,,Specific objectives to improve knowledge and prepare EE project pipelines support technology adoption under the business environment objective.
+OE,PR-T1390,OE1,Modernizacion del MAG y formulacion de politicas agrarias,,NO,None,,,"The general objective targets the agriculture sector via 'modernizacion institucional' y 'fortalecimiento de capacidades' del MAG y enfasis en 'agricultura familiar y la seguridad alimentaria', but no strategic objective or expected result in the strategy covers agriculture or food security, so none fits (division PTI/ARD confirms the sector)."
+OP,PR-T1390,,,,NO,None,,,No target in the provided strategy covers the agriculture sector or food security evidenced by the general objective.
+OE,PR-T1391,OE1,Fortalecer capacidad institucional de la AFD para financiar nuevos sectores,ER1,YES,Mayor asignación de crédito para actividades no tradicionales,,,"Under the business environment objective, strengthening AFD (a public-sector development finance agency) to identify demand and improve its value proposition to boost financing for new growth sectors evidences a shift toward greater credit allocation to non-traditional activities."
+OE,PR-T1391,OE2,Apoyo al diseño e implementación del programa PR-L1203,ER1,YES,Mayor asignación de crédito para actividades no tradicionales,,,"Under the business environment objective, supporting the design and implementation of the AFD-executed credit program to finance new productive sectors points to increasing credit allocation to non-traditional activities."
+OP,PR-T1391,,,,YES,Mayor asignación de crédito para actividades no tradicionales,,,Both specific objectives contribute to increasing credit allocation to non-traditional activities through AFD’s strengthened financing and a dedicated credit program.
+OE,PR-T1392,OE1,Action Plan C&D,,NO,None,,,"The general objective 'Action Plan C&D' names no sector, service or population and could fit multiple objectives, and division CSC/CPR does not disambiguate the sector."
+OP,PR-T1392,,,,NO,None,,,"Only the general objective was available and it does not identify what the operation acts upon, and the division does not disambiguate the sector."
+OE,PR-T1393,OE1,Fortalecimiento logistico y facilitacion comercial digital,ER1,YES,Mayor interoperabilidad de servicios de comercio internacional,,,"Bajo 'Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo', el OE impulsa la coordinacion y la digitalizacion de procesos de comercio exterior y la gestion coordinada de fronteras, lo que apunta a la interoperabilidad de servicios."
+OE,PR-T1393,OE1,Fortalecimiento logistico y facilitacion comercial digital,SO1,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,"Bajo 'Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación', el OE actua sobre herramientas de atraccion, promocion y facilitacion de inversiones y exportaciones, pero no evidencia un RE de ese objetivo; el mas cercano es 'Mayor adopción de tecnologías e innovación' por la digitalizacion de procesos, que no mide adopcion a nivel de firmas."
+OP,PR-T1393,,,,YES,Mayor interoperabilidad de servicios de comercio internacional,,,La CT conecta con este resultado mediante la digitalizacion de procesos de comercio exterior y la gestion coordinada de fronteras.
+OP,PR-T1393,,,,YES,"Mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación",,,"La operacion incide en el clima de negocios a traves de herramientas de inversion y exportacion, sin evidenciar un RE especifico de ese objetivo."
+OE,PR-T1394,OE1,Fortalecer marco normativo y CSS,ER1,YES,Mejora en la supervisión de las entidades de pensión,,,"Bajo el objetivo de Fomentar la sostenibilidad financiera del sistema de pensiones, el fortalecimiento del marco regulatorio del SNJP y la operatividad del CSS apuntalan la supervisión de las entidades de pensión (RE 7.2)."
+OE,PR-T1394,OE2,Puesta en marcha de la SP para supervisar EJP,ER1,YES,Mejora en la supervisión de las entidades de pensión,,,"Bajo el objetivo de Fomentar la sostenibilidad financiera del sistema de pensiones, crear y operar la SP para supervisar EJP incide directamente en la mejora de la supervisión (RE 7.2)."
+OE,PR-T1394,OE3,Herramientas de supervisión basada en riesgos,ER1,YES,Mejora en la gestión de riesgo del sistema público de pensiones,,,"Bajo el objetivo de Fomentar la sostenibilidad financiera del sistema de pensiones, dotar a la SP de metodologías de supervisión basada en riesgos mejora la gestión de riesgos del sistema público (RE 7.1)."
+OE,PR-T1394,OE3,Herramientas de supervisión basada en riesgos,ER2,YES,Mejora en la supervisión de las entidades de pensión,,,"Bajo el objetivo de Fomentar la sostenibilidad financiera del sistema de pensiones, estas herramientas también fortalecen la capacidad supervisora de la SP sobre las entidades de pensión (RE 7.2)."
+OP,PR-T1394,,,,YES,Mejora en la supervisión de las entidades de pensión,,,Varios objetivos específicos fortalecen la supervisión de las entidades de pensión.
+OP,PR-T1394,,,,YES,Mejora en la gestión de riesgo del sistema público de pensiones,,,Las herramientas de supervisión basada en riesgos contribuyen a mejorar la gestión de riesgo del sistema público de pensiones.
+OE,PR-T1395,OE1,Apoyo al combate a la corrupcion y gobernanza OCDE,,NO,None,,,"La OE trata sobre gobernanza publica y anticorrupcion alineada a estandares OCDE, materia que no corresponde a ningun resultado ni objetivo sectorial listado en la estrategia, por lo que no hay alineacion evidenciable."
+OP,PR-T1395,,,,NO,None,,,La operacion no evidencia alineacion con ningun resultado u objetivo sectorial incluido en la estrategia dada.
+OE,PR-T1396,OE1,Estudios de preinversion del Corredor Bioceanico,ER1,YES,Mayor cobertura de infraestructura de transporte terrestre,,,"Bajo el objetivo de transporte, la OE apoya estudios de preinversion para la construccion del Corredor Bioceanico, lo que se orienta a expandir la cobertura de infraestructura terrestre (SO 4)."
+OP,PR-T1396,,,,YES,Mayor cobertura de infraestructura de transporte terrestre,,,"La cooperacion tecnica se vincula a este resultado al financiar estudios de preinversion para la expansion del Corredor Bioceanico, dentro del objetivo de transporte (SO 4)."
+OE,PR-T1397,OE1,Evaluacion de impacto del Programa de Mejoras Habitacionales,SO1,YES,Reducir los déficits cuantitativos y cualitativos de viviendas sostenibles,,,"Bajo el objetivo de vivienda, la OE evalua efectos sobre la calidad de vivienda en un programa liderado por el ministerio público de vivienda; el RE más cercano es 'Menor brecha en la calidad de vivienda', pero una evaluación no reduce por sí misma esa brecha."
+OP,PR-T1397,,,,YES,Reducir los déficits cuantitativos y cualitativos de viviendas sostenibles,,,La operación se vincula a nivel de objetivo del sector vivienda al producir evidencia y no mover directamente un resultado específico.
+OE,PR-T1398,OE1,Marco regulatorio y operativo para seguridad de presas y sedimentos,SO1,YES,"Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia",,,"Pertenece al objetivo de energía; el marco de seguridad de presas no evidencia los RE cercanos de mayor eficiencia del subsector de electricidad ni incremento en generación de energía renovable no convencional, por lo que solo alcanza alineación a nivel del objetivo."
+OE,PR-T1398,OE2,Capacidades técnicas para seguridad de presas y gestión de embalses,SO1,YES,"Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia",,,"Pertenece al objetivo de energía; el fortalecimiento de capacidades en agencias públicas que operan presas no asegura por sí mismo los RE cercanos de mayor eficiencia del subsector de electricidad ni incremento en generación renovable, por lo que se alinea a nivel del objetivo."
+OP,PR-T1398,,,,YES,"Promover la eficiencia en el sector energético, impulsar la diversificación de la oferta energética, y fomentar la demanda de energía limpia",,,"Los dos OE actúan sobre el sector energético mediante seguridad de presas y fortalecimiento institucional sin evidenciar un RE específico, por lo que la alineación agregada es al nivel del objetivo."
+OE,PR-T1399,OE1,Esquema de gestion de activos viales en MOPC,SO1,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",,,"Bajo el objetivo de transporte, fortalecer al MOPC (entidad publica del sector vial) con un esquema de gestion de activos actua sobre la infraestructura vial, pero no evidencia el RE 4.2 de resiliencia porque un sistema de informacion y planificacion no genera por si mismo infraestructura mas resiliente."
+OP,PR-T1399,,,,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",,,"La CT se vincula a nivel general con el objetivo de transporte mediante el establecimiento de un esquema de gestion de activos en el MOPC, sin evidenciar un resultado especifico."
+OE,PR-T1400,OE1,Action Plan C&D,,NO,None,,,"The general objective 'Action Plan C&D' does not identify any sector or service and could fit multiple unrelated objectives, and division CSC/CPR does not disambiguate."
+OP,PR-T1400,,,,NO,None,,,Only the general objective was available and it does not identify what the operation acts upon.
+OE,PR-T1402,OE1,Fortalecimiento tecnico-operativo del programa Semillas del Futuro,,NO,None,,,"El OE fortalece un programa de cuidado infantil del MINNA para insercion laboral de mujeres, un ambito de proteccion social y cuidados no cubierto por los objetivos y resultados listados en la estrategia provista."
+OP,PR-T1402,,,,NO,None,,,Ningun objetivo especifico evidencia un resultado u objetivo de la estrategia listada dado que la intervencion se circunscribe a cuidados y proteccion social no contemplados en esos objetivos.
+OE,PR-T1404,OE1,Efectividad de reformas de modernizacion del Estado en servicio civil,,NO,None,,,"El OE actua sobre la administracion publica y el servicio civil, materias no cubiertas por los objetivos listados (saneamiento, energia, ambiente de negocios/innovacion, transporte, salud, vivienda, pensiones), por lo que no evidencia ningun resultado."
+OE,PR-T1404,OE2,Uso de datos para decisiones de gestion de capital humano publico,,NO,None,,,"El OE aborda datos y sistemas de gestion de recursos humanos del sector publico, lo cual no corresponde a ningun resultado bajo los objetivos de la estrategia provistos."
+OP,PR-T1404,,,,NO,None,,,"La operacion se centra en administracion publica y servicio civil, tematicas no contempladas por los objetivos y resultados esperados disponibles en la estrategia."
+OE,PR-T1405,OE1,Fiscal management strengthened,,NO,None,,,"Strengthening the Ministry of Economy and Finance for budget, treasury, accounting, purchases and supply is public financial management, which is not covered by any objective or result listed in the strategy."
+OP,PR-T1405,,,,NO,None,,,"No result or objective in the strategy covers public financial management, so the operation does not align."
+OE,PR-T1407,OE1,Fortalecer capacidades del Viceministerio de Transporte,SO1,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",,,"Under the transport objective, the Viceministerio de Transporte is a public-sector entity of the transport sector; the closest results are on coverage and resilience of transport infrastructure (RE 4.1–4.2), which organizational and regulatory strengthening does not evidence by itself."
+OE,PR-T1407,OE2,Procesos licitatorios y fideicomiso del sistema,SO1,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",,,"Within the transport objective, supporting bidding processes and a sector trust fund is instrumental to the system but does not by itself expand coverage nor make infrastructure more resilient (RE 4.1–4.2)."
+OE,PR-T1407,OE3,Programa piloto de mujeres conductoras,SO1,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",,,"Within the transport objective, a gender-inclusion pilot for women drivers acts upon the public transport service but does not evidence increased coverage or resilience of transport infrastructure (RE 4.1–4.2)."
+OP,PR-T1407,,,,YES,"Expandir la cobertura y la resiliencia de la infraestructura de transporte, e impulsar el comercio transfronterizo",,,The specific objectives act upon the transport sector without evidencing any specific result under it.
+OE,PR-T1410,OE1,Capacidades e instrumentos para CPI,ER1,YES,Mayor adopción de tecnologías e innovación,,,"Bajo el objetivo de mejorar el ambiente de negocios, impulsar la inversión privada y fomentar la innovación, el OE fortalece la Compra Pública de Innovación como instrumento para promover la adopción de innovación."
+OP,PR-T1410,,,,YES,Mayor adopción de tecnologías e innovación,,,La operación se conecta a este resultado mediante el fortalecimiento de la Compra Pública de Innovación.
+OE,PR-T1411,OE1,Proteccion y gestion de la PI para el ecosistema de innovacion,ER1,YES,Mayor adopción de tecnologías e innovación,,,"Under the business environment and innovation objective, the words 'impulsar el desarrollo del ecosistema de innovación' connect to greater adoption of technologies and innovation, and division PTI/CTI confirms the innovation focus."
+OP,PR-T1411,,,,YES,Mayor adopción de tecnologías e innovación,,,"The general objective cites 'ecosistema de innovación', aligning with the business environment and innovation objective's result on technology and innovation adoption, consistent with division PTI/CTI."
+OE,PR-T1412,OE1,Fortalecimiento operativo y estratégico de BECAL,ER1,YES,Menor brecha de capital humano,,,"Bajo el objetivo de mejorar el ambiente de negocios, impulsar la inversión privada, y fomentar la innovación, el OE fortalece el programa público BECAL para alinear el capital humano avanzado con prioridades productivas, lo que apunta a reducir la brecha de capital humano."
+OP,PR-T1412,,,,YES,Menor brecha de capital humano,,,"La operación fortalece BECAL para alinear capital humano avanzado con prioridades productivas, lo que conecta con reducir la brecha de capital humano bajo el objetivo de negocios e innovación."
+</script>
+<script type="text/plain" id="resumen-src">
+RESUMEN EJECUTIVO
+Paraguay · Estrategia de País 2025-2029
+
+
+ALINEACIÓN A LA ESTRATEGIA
+
+Los 7 Objetivos Estratégicos de la EBP:
+- Todos tienen operaciones alineadas.
+- 6 tienen al menos una operación con alineación fuerte.
+- El objetivo “Fomentar la sostenibilidad financiera del sistema de pensiones” recibe apoyo únicamente de cooperaciones técnicas, que no tienen grado de alineación.
+
+Los 20 Resultados Esperados de la EBP:
+- 19 de 20 tienen operaciones alineadas.
+- 10 tienen al menos una operación con alineación fuerte.
+- 4 solo cuentan con operaciones alineadas de forma débil: “Menor dependencia a combustibles fósiles”, “Mayor participación de mujeres en liderazgo de empresas”, “Mayor resiliencia del sector productivo al cambio climático” y “Mayor interoperabilidad de servicios de comercio internacional”.
+- 5 reciben apoyo únicamente de cooperaciones técnicas, que no tienen grado de alineación: “Incremento en generación de energía renovable no convencional”, “Mayor asignación de crédito para actividades no tradicionales”, “Mayor cobertura de infraestructura de transporte terrestre”, “Mejora en la gestión de riesgo del sistema público de pensiones” y “Mejora en la supervisión de las entidades de pensión”.
+- El resultado esperado “Mayor asignación de crédito para firmas exportadoras” no tiene ninguna operación alineada.
+
+
+LA CARTERA
+
+De un total de 103 operaciones activas desde la aprobación de la EBP vigente (préstamos, garantías, investment grants y cooperaciones técnicas), 38 son préstamos y garantías y 65 son cooperaciones técnicas.
+
+Préstamos y garantías: de las 38 del universo, 33 (87%) presentan al menos una alineación con la EBP. Se identificaron 47 alineaciones, 15 fuertes y 32 débiles. De ellas, 36 se vinculan con un resultado esperado de la EBP y 22 con un objetivo estratégico.
+
+Cooperaciones técnicas: de las 65 del universo, 43 (66%) presentan al menos una alineación con la EBP. Se identificaron 58 alineaciones, que no tienen grado de alineación. De ellas, 47 se vinculan con un resultado esperado de la EBP y 30 con un objetivo estratégico.
+
+27 operaciones fueron analizadas sin encontrar relación con la EBP: PR-L1147, PR-L1148, PR-L1150, PR-L1176, PR-L1192, PR-T1295, PR-T1325, PR-T1327, PR-T1338, PR-T1341, PR-T1346, PR-T1347, PR-T1348, PR-T1349, PR-T1356, PR-T1359, PR-T1362, PR-T1376, PR-T1381, PR-T1383, PR-T1390, PR-T1392, PR-T1395, PR-T1400, PR-T1402, PR-T1404, PR-T1405.
+
+
+CONCENTRACIÓN
+
+La mitad de las operaciones alineadas se concentra en cinco de los 19 resultados esperados de la EBP con cobertura. Los cinco con mayor número de operaciones son: “Mayor adopción de tecnologías e innovación” (9 operaciones), “Menor brecha de capital humano” (8), “Mayor eficiencia del subsector de electricidad” (6), “Mejor gerenciamiento del sistema de salud” (6), “Menor dependencia a combustibles fósiles” (5).
+</script>
+<script type="text/plain" id="colores-src">@@COLORES@@</script>
+<script type="text/plain" id="lang-src">Español</script>
+
+<div class="tab-content" id="tab-resumenejec">
+  <div class="tab-intro" data-i18n="intro_resumenejec">Resumen ejecutivo de la alineación cartera–estrategia (generado en el flujo).</div>
+  <div id="resumen-ejec-cont" style="margin:8px 36px 24px;max-width:var(--viz-max);white-space:pre-wrap;line-height:1.6;font-size:13.5px;color:var(--ink);"></div>
+</div>
+
+<script>
+/* ============================================================
+   PARTE 1 — ESTRUCTURA DE LA ESTRATEGIA (fija para DR).
+   Jerarquía: Pilar (área estratégica) › Objetivo Estratégico › ER.
+   Si algún día cambia la estrategia del país, se edita acá.
+   ============================================================ */
+/* ============================================================
+   PARTE 1 — ESTRUCTURA DE LA ESTRATEGIA DEL PAÍS
+   Jerarquía: Pilar (área estratégica) › Objetivo Estratégico › ER.
+
+   ⚠️ AL CAMBIAR DE PAÍS, LEER ESTO:
+   1. Copiá el texto de cada ER EXACTAMENTE como se le pasa al agente
+      de clasificación: mismo IDIOMA y misma REDACCIÓN que ve el agente.
+      NO transcribas desde una matriz traducida (p. ej. una imagen en
+      inglés) si el agente trabaja en español: ese fue el origen de que
+      cambiaran nombres y no coincidieran los resultados.
+   2. El texto de cada ER debe coincidir con la columna related_er del
+      output del agente. La normalización de más abajo ya tolera las
+      diferencias de FORMATO (punto final, espacios, mayúsculas, acentos),
+      así que no hace falta que sea idéntico carácter a carácter.
+   3. Si el agente además REFORMULA un ER (redacción distinta, no solo
+      formato), agregá esa variante en ER_ALIASES. El panel de
+      diagnóstico (arriba de las pestañas) te dice cuáles hace falta.
+   ============================================================ */
+let STRATEGY = [
+  { pilar:"NOMBRE DEL ÁREA / PILAR 1", objetivos:[
+    { obj:"Nombre del objetivo estratégico", ers:[
+      "Texto exacto del Resultado Esperado (ER), tal como lo ve el agente",
+      "Texto exacto de otro ER",
+    ]},
+    { obj:"Otro objetivo estratégico", ers:[
+      "Texto exacto del ER",
+    ]},
+  ]},
+  { pilar:"NOMBRE DEL ÁREA / PILAR 2", objetivos:[
+    { obj:"Nombre del objetivo estratégico", ers:[
+      "Texto exacto del ER",
+    ]},
+  ]},
+  // ... un bloque { pilar... } por cada área estratégica ...
+];
+
+/* ============================================================
+   NORMALIZACIÓN DE ER — capa fija, agnóstica de país e idioma.
+   Hace robusta la vinculación entre el related_er del agente y el ER
+   canónico de la estrategia: ignora punto final, espacios, mayúsculas
+   y acentos. NO tocar al cambiar de país.
+   ============================================================ */
+/* Parte un texto en hasta maxLines líneas de ~maxChars caracteres, cortando por palabra.
+   Si aún excede, trunca la última línea con "…". Devuelve array de líneas. */
+function wrapLabel(text, maxChars, maxLines){
+  maxChars=maxChars||46; maxLines=maxLines||2;
+  const words=String(text||"").replace(/\s+/g," ").trim().split(" ");
+  const out=[]; let line="";
+  for(let i=0;i<words.length;i++){
+    const w=words[i];
+    const t=line?line+" "+w:w;
+    if(t.length<=maxChars){ line=t; }
+    else if(out.length<maxLines-1){ if(line)out.push(line); line=w; }
+    else { line=t; }   // en la última línea permitida: seguir para truncar después
+  }
+  if(line) out.push(line);
+  if(out.length>maxLines) out.length=maxLines;
+  // ¿quedó texto sin mostrar? truncar la última línea
+  const lastIdx=out.length-1;
+  if(out[lastIdx] && out[lastIdx].length>maxChars){
+    let s=out[lastIdx].slice(0,maxChars-1);
+    s=s.replace(/\s+\S*$/,"");           // no cortar palabra a la mitad
+    out[lastIdx]=(s||out[lastIdx].slice(0,maxChars-1))+"…";
+  }
+  return out;
+}
+function _normKey(s){
+  return String(s||"")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")   // sin acentos
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g," ")                          // solo alfanumérico
+    .trim();
+}
+/* ER_ALIASES — ESPECÍFICO DE CADA PAÍS. Dejar VACÍO por defecto.
+   Solo se llena cuando el agente REFORMULA un ER (no por diferencias de
+   formato, que ya resuelve _normKey). Formato:
+     "texto de la variante que devuelve el agente": "ER canónico de STRATEGY",
+   El panel de diagnóstico indica qué cadenas agregar acá. */
+const ER_ALIASES = {
+};
+/* SHOW_OBJ_LINKS: true dibuja líneas directas Operación→Objetivo para las filas cuyo
+   related_er es el nombre de un Objetivo (no un RE). false las ignora (versión "solo RE"). */
+let SHOW_OBJ_LINKS = true;
+const OBJ_PREFIX="##OBJ##";   // marca un related_er que en realidad apunta a un Objetivo Estratégico
+let _erCanonIndex=null, _objCanonIndex=null;
+function _buildErCanonIndex(){
+  _erCanonIndex={}; _objCanonIndex={};
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>{
+    _objCanonIndex[_normKey(o.obj)]=o.obj;
+    o.ers.forEach(er=>{ _erCanonIndex[_normKey(er)]=er; });
+  }));
+  Object.keys(ER_ALIASES).forEach(k=>{ _erCanonIndex[_normKey(k)]=ER_ALIASES[k]; });
+}
+function canonicalER(text){
+  const s=String(text==null?"":text).trim();
+  if(s===""||s.toLowerCase()==="none") return "None";
+  if(!_erCanonIndex) _buildErCanonIndex();
+  const k=_normKey(s);
+  if(_erCanonIndex[k]) return _erCanonIndex[k];        // matchea un RE
+  if(_objCanonIndex[k]) return OBJ_PREFIX+_objCanonIndex[k];  // matchea un Objetivo -> línea op→objetivo
+  return s;                                            // sin match -> se mantiene (no coincidente)
+}
+function isObjRef(er){ return typeof er==="string" && er.indexOf(OBJ_PREFIX)===0; }
+function objOf(er){ return isObjRef(er) ? er.slice(OBJ_PREFIX.length) : null; }
+
+/* ============================================================
+   PARTE 2 — DATOS DEL OUTPUT DEL AGENTE (una fila por alineación OE→ER).
+   Reemplazar el contenido de ROWS con el output real.
+     op, op_type("A"/"B"), oe_id, oe(texto), er(related_er / "None"),
+     conn("YES"/"NO"), feas, align("Strong"/"Weak"/"None"), reasoning
+   El texto de "er" debe coincidir con un ER de STRATEGY para conectar.
+   ============================================================ */
+let ROWS = [
+  {op:"XX-L0001", op_type:"A", oe_id:"OE1", oe:"RE de operación de ejemplo (alineación fuerte)", er:"Texto exacto del Resultado Esperado (ER), tal como lo ve el agente", conn:"YES", feas:"High", align:"Strong", reasoning:"Fila de ejemplo — se reemplaza al cargar el CSV real del agente."},
+  {op:"XX-L0001", op_type:"A", oe_id:"OE2", oe:"RE de operación de ejemplo (alineación débil)", er:"Texto exacto de otro ER", conn:"YES", feas:"Low", align:"Weak", reasoning:"Fila de ejemplo."},
+  {op:"XX-T0001", op_type:"B", oe_id:"OE1", oe:"Cooperación técnica de ejemplo", er:"Texto exacto del ER", conn:"YES", feas:"", align:"Weak", reasoning:"Fila de ejemplo."},
+  {op:"XX-L0002", op_type:"A", oe_id:"OE1", oe:"Operación de ejemplo sin alineación", er:"None", conn:"NO", feas:"", align:"None", reasoning:"Fila de ejemplo sin conexión con la estrategia."},
+];
+
+/* Normaliza el ER de cada fila embebida con el mismo criterio que usaba la carga por CSV.
+   Permite pegar el output del agente TAL CUAL en ROWS (sin limpiar punto final, acentos,
+   etc.): la canonicalización y el panel de diagnóstico se resuelven automáticamente. */
+ROWS = ROWS.map(r => Object.assign({}, r, { er: canonicalER(r.er) }));
+
+/* ==== Inyección desde el flujo: si los placeholders fueron reemplazados, usarlos ==== */
+(function(){
+  try{ var se=document.getElementById('estrategia-src'); if(se){ var t=se.textContent.trim();
+    if(t && !(t.charAt(0)==='@'&&t.charAt(1)==='@')){ var st=buildStrategyFromFlat(t); if(st && st.length) STRATEGY=st; } } }catch(e){ console.log('estrategia-src',e); }
+  // La STRATEGY real ya está cargada: invalidar el índice canónico para que se reconstruya con ella
+  // (si no, parseAgentCSV canonizaría contra la estrategia de ejemplo y no detectaría los objetivos).
+  _erCanonIndex=null; _objCanonIndex=null;
+  try{ var de=document.getElementById('datos-src'); if(de){ var t=de.textContent.trim();
+    if(t && !(t.charAt(0)==='@'&&t.charAt(1)==='@')){ var rw=parseAgentCSV(t); if(rw && rw.length) ROWS=rw; } } }catch(e){ console.log('datos-src',e); }
+  // Re-canonizar cualquier ROWS embebido con el índice correcto (por si no vino datos-src)
+  ROWS = ROWS.map(function(r){ return Object.assign({}, r, { er: canonicalER(r.er) }); });
+})();
+
+/* ====== Lógica de render ====== */
+const tip = d3.select("#tip");
+let PIN=false, HOVERON=false;   // clic para fijar lo resaltado
+function _clearAllHighlight(){
+  d3.selectAll("path.link").classed("dim",false).classed("show",false);
+  d3.selectAll(".node-dim").classed("node-dim",false);
+  d3.selectAll("path.shortlink").classed("dim",false);
+}
+function _unpin(){ PIN=false; HOVERON=false; _clearAllHighlight(); tip.style("opacity",0); }
+function _chartClick(){ if(PIN){ _unpin(); } else if(HOVERON){ PIN=true; } }
+function showTip(html,ev){ if(PIN) return; HOVERON=true; tip.html(html).style("opacity",1).style("left",(ev.clientX+14)+"px").style("top",(ev.clientY+14)+"px");}
+function hideTip(){ if(PIN) return; HOVERON=false; tip.style("opacity",0);}
+function curve(x1,y1,x2,y2){const mx=(x1+x2)/2;return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;}
+
+// Índice ER -> {pilar, obj}
+const erIndex = {};
+STRATEGY.forEach(p => p.objetivos.forEach(o => o.ers.forEach(er => { erIndex[er] = {pilar:p.pilar, obj:o.obj}; })));
+
+// Stats
+function computeStats(){
+  const allOps=[...new Set(ROWS.map(r=>r.op))];
+  const opType={}; ROWS.forEach(r=>{ opType[r.op]=r.op_type; });
+  const prestamos = allOps.filter(op=>opType[op]!=="B").length;   // operaciones tipo A (INV + INV GR)
+  const nObjetivos = STRATEGY.reduce((a,p)=>a+p.objetivos.length,0);
+  // ER cubiertos por operación tipo A (cartera activa)
+  const erCubA = new Set(ROWS.filter(r=>r.conn==="YES"&&r.op_type!=="B"&&r.er&&r.er!=="None").map(r=>r.er));
+  // Total de RE de la EBP = pares (objetivo, ER); cubiertos = pares cuyo ER tiene op A alineada
+  let paresEBP=0, paresCub=0;
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>{ paresEBP++; if(erCubA.has(er)) paresCub++; })));
+  document.getElementById("stats").innerHTML=`
+    <div class="stat"><div class="n">${prestamos}</div><div class="l">Préstamos (INV + INV GR)<sup class="ast">*</sup></div></div>
+    <div class="stat"><div class="n">${STRATEGY.length}</div><div class="l">Pilares en EBP</div></div>
+    <div class="stat"><div class="n">${nObjetivos}</div><div class="l">Objetivos estratégicos en EBP</div></div>
+    <div class="stat"><div class="n">${paresEBP}</div><div class="l">Resultados esperados en EBP</div></div>
+    <div class="stat"><div class="n">${paresCub}</div><div class="l">Resultados esperados en EBP cubiertos</div></div>`;
+}
+computeStats();
+
+/* ========================================================================
+   COLORES — Probabilidad de logro (SOLO operaciones tipo A).
+   - OE (RE de operación): color propio (Verde/Amarillo/Rojo) o gris si no hay dato.
+   - Operación (cuadrado): color agregado según reglas sobre sus OE.
+   - RE de estrategia y Objetivo: color CONTINUO = promedio 0–1 de las operaciones
+     tipo A alineadas con probabilidad revisada.
+   - Cooperaciones Técnicas (tipo B): siempre celeste.
+   ======================================================================== */
+let COLOR_OE = {
+  // Vacío = viz SIN colores de probabilidad (se ve como el caso simple).
+  // Para colorear: pegá acá "PROJECT|OEID":"Verde"/"Amarillo"/"Rojo" desde colores_por_oeid.csv
+  // Ej:  "DR-L1150|OE1":"Verde",
+};
+const PROB_HEX={"Verde":"#3fb96b","Amarillo":"#f2c14e","Rojo":"#e0524d","Gris":"#c2cad6"};
+const PROB_VAL={"Verde":1,"Amarillo":0.5,"Rojo":0};   // escala 0–1
+const TC_HEX="#6cb2e4";                                // celeste para CT
+// Operaciones en pipeline: se muestran con borde azul y fondo blanco (no llevan color de probabilidad)
+const PIPELINE_OPS = new Set([  /* agregar aquí los códigos de operaciones en pipeline, ej: "ME-L1350","ME-L1352" */  ]);
+function isPipeline(op){ return PIPELINE_OPS.has(op); }
+let HAS_COLORS=false; let COLOR_OE_BY_OP={};
+function rebuildColors(){
+  COLOR_OE_BY_OP={};
+  Object.keys(COLOR_OE).forEach(k=>{const i=k.indexOf("|");const op=k.slice(0,i),oe=k.slice(i+1);(COLOR_OE_BY_OP[op]=COLOR_OE_BY_OP[op]||{})[oe]=COLOR_OE[k];});
+  HAS_COLORS=Object.keys(COLOR_OE).length>0;
+}
+rebuildColors();
+/* Parser del CSV de colores (project, oe_id, color) -> mapa "project|oe_id":"Color" */
+function csvToColors(text){
+  const parsed=parseCSV(text); if(parsed.length<2) return {};
+  const h=parsed[0].map(x=>x.trim().toLowerCase());
+  const iP=h.indexOf("project"), iO=h.indexOf("oe_id"), iC=h.indexOf("color");
+  const map={}; if(iP<0||iO<0||iC<0) return map;
+  const cap=x=>x?x.charAt(0).toUpperCase()+x.slice(1).toLowerCase():"";
+  for(let k=1;k<parsed.length;k++){ const r=parsed[k];
+    const p=(r[iP]||"").trim(), o=(r[iO]||"").trim(), c=cap((r[iC]||"").trim());
+    if(p&&o&&(c==="Verde"||c==="Amarillo"||c==="Rojo")) map[p+"|"+o]=c;
+  }
+  return map;
+}
+/* Inyección de colores desde el flujo (placeholder @@COLORES@@ reemplazado por Power Automate).
+   Se ejecuta aquí, después de declarar COLOR_OE, csvToColors y rebuildColors,
+   para evitar el error "Cannot access 'COLOR_OE' before initialization". */
+(function(){
+  try{ var ce=document.getElementById('colores-src'); if(ce){ var t=ce.textContent.trim();
+    if(t && !(t.charAt(0)==='@'&&t.charAt(1)==='@')){ var cmap=csvToColors(t); if(cmap && Object.keys(cmap).length){ COLOR_OE=cmap; rebuildColors(); } } } }catch(e){ console.log('colores-src',e); }
+})();
+/* Muestra/oculta la leyenda de probabilidad según HAS_COLORS y la pestaña activa. */
+function applyLegend(){
+  var lg=document.getElementById("legend"), ln=document.getElementById("legend-note");
+  var at=document.querySelector(".tab.active"); var name=at?at.dataset.tab:"A";
+  var show = HAS_COLORS && !(name==="tabla"||name==="resumen"||name==="agregada"||name==="resumenejec");
+  if(lg) lg.style.display=show?"flex":"none";
+  if(ln) ln.style.display=HAS_COLORS?"":"none";
+}
+function oeColorName(op,oe){const c=COLOR_OE[op+"|"+oe];return (c==="Verde"||c==="Amarillo"||c==="Rojo")?c:"Gris";}
+function oeHex(op,oe){return PROB_HEX[oeColorName(op,oe)];}
+function opColorName(op){
+  const m=COLOR_OE_BY_OP[op]||{};
+  const cols=Object.values(m).filter(c=>c==="Verde"||c==="Amarillo"||c==="Rojo");
+  const n=cols.length; if(n===0) return "Gris";
+  const g=cols.filter(c=>c==="Verde").length, y=cols.filter(c=>c==="Amarillo").length, r=cols.filter(c=>c==="Rojo").length;
+  if(r>g && r>y) return "Rojo";              // mayoría roja -> rojo
+  if(g>=y && g>=r && g!==r) return "Verde";  // verde domina (le gana al amarillo en empate); empate verde-rojo NO
+  return "Amarillo";                         // empate verde-rojo, mayoría amarilla, o mezcla -> amarillo
+}
+function opMeanValue(op){
+  const m=COLOR_OE_BY_OP[op]; if(!m) return null;
+  const vals=Object.values(m).map(c=>PROB_VAL[c]).filter(v=>v!=null);
+  return vals.length? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+// Valor de un RE de operación específico (op + oe_id), según su color asignado.
+function oeValue(op,oe){
+  const m=COLOR_OE_BY_OP[op]; if(!m||!oe) return null;
+  const v=PROB_VAL[m[oe]]; return (v==null)?null:v;
+}
+function contHex(v){
+  if(v==null) return "#c2cad6";
+  const st=[[0,[224,82,77]],[0.25,[239,138,77]],[0.5,[242,193,78]],[0.75,[182,200,74]],[1,[63,185,107]]];
+  v=Math.max(0,Math.min(1,v));
+  for(let i=1;i<st.length;i++){ if(v<=st[i][0]){ const a=st[i-1][0],b=st[i][0],ca=st[i-1][1],cb=st[i][1],t=(v-a)/(b-a);
+    const c=ca.map((x,j)=>Math.round(x+(cb[j]-x)*t)); return "rgb("+c[0]+","+c[1]+","+c[2]+")"; } }
+  return "rgb(63,185,107)";
+}
+function inkOn(name,isTC){ if(isTC) return "#ffffff"; return (name==="Amarillo"||name==="Gris")?"#1a2238":"#ffffff"; }
+
+function drawSankeyBase(svgId, rows){
+  const svg=d3.select(svgId); svg.selectAll("*").remove();
+  PIN=false; HOVERON=false; svg.on("click", _chartClick);
+  const isTC = rows.every(r=>r.op_type==="B");
+  if(rows.length===0){ svg.attr("viewBox","0 0 1180 200"); svg.append("text").attr("x",590).attr("y",100).attr("text-anchor","middle").attr("fill","var(--muted)").attr("font-size",15).text("No hay operaciones de este tipo."); return; }
+
+  const ops=(()=>{
+    const arr=[...new Set(rows.map(r=>r.op))];
+    const erIdx={}; let _k=0; STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>{ if(!(er in erIdx)) erIdx[er]=_k++; })));
+    const keyOf=op=>{ let m=Infinity; rows.forEach(r=>{ if(r.op===op&&r.conn==="YES"&&(r.er in erIdx)) m=Math.min(m,erIdx[r.er]); }); return m; };
+    return arr.map(op=>({op,k:keyOf(op)})).sort((a,b)=> (a.k-b.k) || (arr.indexOf(a.op)-arr.indexOf(b.op))).map(x=>x.op);
+  })();
+  // OE alineados (los que tienen al menos una conexión YES) -> círculos
+  const oeAll=[]; rows.forEach(r=>{const k=r.op+"|"+r.oe_id; if(!oeAll.find(o=>o.key===k)) oeAll.push({key:k,op:r.op,oe_id:r.oe_id,oe:r.oe});});
+  const oeConnected = oeAll.filter(o => rows.some(r=>r.op===o.op&&r.oe_id===o.oe_id&&r.conn==="YES"));
+  // Operaciones que no tienen NINGÚN OE alineado -> se muestran solas en gris
+  const opsAlineadas = new Set(oeConnected.map(o=>o.op));
+
+  // ER presentes en los datos (con alineación), ordenados por STRATEGY (pilar/obj)
+  const ersData = new Set(rows.filter(r=>r.conn==="YES"&&r.er&&r.er!=="None").map(r=>r.er));
+  // Estructura visible: TODA la estrategia (pilares/objetivos/ER), marcando cuáles quedaron sin alinear.
+  const erAligned = er => ersData.has(er);
+  const visPilares=[];
+  STRATEGY.forEach(p=>{
+    const objs=[];
+    p.objetivos.forEach(o=>{
+      const ers=o.ers.slice();                    // todos los ER del objetivo
+      const anyAl=ers.some(erAligned);
+      objs.push({obj:o.obj, ers, aligned:anyAl});  // objetivo sin alinear = ningún ER alineado
+    });
+    if(objs.length) visPilares.push({pilar:p.pilar, objetivos:objs});
+  });
+
+  // Layout
+  const rowH=50, padTop=90, padBot=40, gapObj=16, gapPilar=30, pilarLabelH=26, objLabelH=0;
+  const colOps=250, colOE=70, colER=770, colObj=1140;
+  const wOps=150, wER=330, wObj=250, rCircle=13;
+
+  // Y de ER (agrupados por pilar/obj), y posición de objetivos
+  const yER={}; const objBox=[]; const pilarBox=[];
+  let cursor=padTop;
+  visPilares.forEach(p=>{
+    const pTop=cursor;
+    cursor+=pilarLabelH;
+    p.objetivos.forEach(o=>{
+      const oTop=cursor;
+      o.ers.forEach((er,i)=>{ yER[er]=cursor+rowH/2; cursor+=rowH; });
+      const oBot=cursor;
+      objBox.push({obj:o.obj, top:oTop, bot:oBot, yc:(oTop+oBot)/2, pilar:p.pilar, aligned:o.aligned});
+      cursor+=gapObj;
+    });
+    cursor+=gapPilar;
+    pilarBox.push({pilar:p.pilar, top:pTop, bot:cursor-gapPilar});
+  });
+  const erBlockH=cursor;
+
+  // Y de operaciones y OE (columna izquierda): agrupar OE bajo su operación
+  // Cada operación ocupa el alto de sus OE-círculos (o 1 si va sola en gris)
+  const opLayout=[]; let oy=padTop;
+  ops.forEach(op=>{
+    // Todos los RE de la operación (alineados y no). Los no alineados se muestran como círculos desconectados.
+    const oesAll=oeAll.filter(o=>o.op===op && o.oe_id);
+    const alignedSet=new Set(oeConnected.filter(o=>o.op===op).map(o=>o.oe_id));
+    const oes=oesAll.map(o=>({...o, aligned:alignedSet.has(o.oe_id)}))
+                    .sort((a,b)=> (a.aligned===b.aligned?0:(a.aligned?-1:1)) || a.oe_id.localeCompare(b.oe_id,undefined,{numeric:true}));
+    const solaGris = !opsAlineadas.has(op);
+    const n = solaGris ? 1 : oes.length;
+    const blockTop=oy;
+    const circles=[];
+    if(!solaGris){
+      oes.forEach((o,i)=>{ circles.push({...o, y: oy + i*(rCircle*2+6) + rCircle}); });
+      oy += n*(rCircle*2+6) + 18;
+    } else {
+      oy += rowH + 10;
+    }
+    const blockBot=oy;
+    opLayout.push({op, solaGris, circles, yc:(blockTop+blockBot)/2 - (solaGris?0:0)});
+  });
+  const opsBlockH=oy;
+
+  const maxH=Math.max(erBlockH, opsBlockH, padTop) + padBot;
+  svg.attr("viewBox",`0 0 1300 ${maxH}`);
+
+  // Encabezados
+  svg.append("text").attr("class","colhead").attr("x",colOps).attr("y",58).attr("text-anchor","middle").text("Operaciones");
+  if(!isTC){ const chOE=svg.append("text").attr("class","colhead").attr("x",colOE).attr("y",40).attr("text-anchor","middle"); chOE.append("tspan").attr("x",colOE).text("RESULTADO"); chOE.append("tspan").attr("x",colOE).attr("dy",13).text("ESPERADO DE LA"); chOE.append("tspan").attr("x",colOE).attr("dy",13).text("OPERACIÓN"); }
+  svg.append("text").attr("class","colhead").attr("x",colER).attr("y",58).attr("text-anchor","middle").text("Resultado esperado de la estrategia");
+  svg.append("text").attr("class","colhead").attr("x",colObj).attr("y",58).attr("text-anchor","middle").text("Objetivo estratégico");
+
+  // Bandas de pilar (fondo blanco) alrededor de los ER
+  pilarBox.forEach(pb=>{
+    svg.append("rect").attr("x",colER-wER/2-14).attr("y",pb.top-4).attr("width",(colObj+wObj/2)-(colER-wER/2)+28).attr("height",pb.bot-pb.top+8).attr("rx",12).attr("fill","#ffffff").attr("opacity",0.65);
+    svg.append("text").attr("class","pilar-label").attr("x",colER-wER/2-6).attr("y",pb.top+16).attr("fill","var(--accent)").text("PILAR: "+pb.pilar.toUpperCase().slice(0,95));
+  });
+
+  const linkLayer=svg.append("g");
+  const allLinks=[];
+
+  // Links Operación -> ER (una sola línea por operación y ER)
+  opLayout.forEach(ol=>{
+    if(ol.solaGris) return;
+    const ers=[...new Set(rows.filter(r=>r.op===ol.op && r.conn==="YES" && r.er && r.er!=="None" && yER[r.er]!==undefined).map(r=>r.er))];
+    ers.forEach(er=>{
+      const rel=rows.filter(r=>r.op===ol.op && r.er===er && r.conn==="YES");
+      const strong=rel.some(r=>r.align==="Strong");
+      const col=strong?"#1f4f8a":"#7fb2e5";
+      const x1=colOps+wOps/2, y1=ol.yc, x2=colER-wER/2, y2=yER[er];
+      const oeList=rel.map(r=>r.oe_id.replace("OE","RE")).join(", ");
+      const _why=(rel.find(r=>r.align==="Strong")||rel.find(r=>r.reasoning&&r.reasoning.trim())||{}).reasoning||"";
+      const path=linkLayer.append("path").attr("class","link").attr("d",curve(x1,y1,x2,y2))
+        .attr("stroke",col).attr("stroke-width",strong?3:1.6).attr("stroke-dasharray",(!isTC&&!strong)?"4,4":null).attr("opacity",0.78)
+        .attr("data-op",ol.op).attr("data-er",er);
+      path.on("mouseover",ev=>showTip(`<b>${ol.op}</b> → ${er}<br>Alineación: <b>${strong?"Strong":"Weak"}</b>`+(_why?`<br><br><span style='color:#dfe7f2'>${_why}</span>`:""),ev))
+        .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",hideTip);
+      allLinks.push({path,op:ol.op,er});
+    });
+  });
+
+  // Links Operación -> Objetivo (filas cuyo related_er es un Objetivo, no un RE)
+  if(SHOW_OBJ_LINKS){
+    const objYc={}; objBox.forEach(ob=>{ objYc[ob.obj]=ob.yc; });
+    opLayout.forEach(ol=>{
+      if(ol.solaGris) return;
+      const objsDir=[...new Set(rows.filter(r=>r.op===ol.op && r.conn==="YES" && isObjRef(r.er) && objYc[objOf(r.er)]!==undefined).map(r=>objOf(r.er)))];
+      objsDir.forEach(obj=>{
+        const rel=rows.filter(r=>r.op===ol.op && objOf(r.er)===obj && r.conn==="YES");
+        const strong=rel.some(r=>r.align==="Strong");
+        const x1=colOps+wOps/2, y1=ol.yc, xc=colObj-wObj/2-24, x2=colObj-wObj/2, y2=objYc[obj];
+        const d=`M${x1},${y1} C${xc},${y1} ${xc},${y2} ${x2},${y2}`;
+        const oeList=rel.map(r=>r.oe_id.replace("OE","RE")).filter(Boolean).join(", ")||"—";
+        const objCol = strong ? "#1f4f8a" : "#7fb2e5";   // color de alineación; sólida=fuerte, punteada=débil
+        const path=linkLayer.append("path").attr("class","link objlink").attr("d",d)
+          .attr("fill","none").attr("stroke",objCol).attr("stroke-width",strong?1.6:1.2)
+          .attr("stroke-dasharray",strong?null:"4,4")
+          .attr("data-op",ol.op).attr("data-obj",obj);
+        path.on("mouseover",ev=>showTip(`<b>${ol.op}</b> → <i>Objetivo</i>: ${obj}<br>Alineación: <b>${strong?"Strong":"Weak"}</b><br><span style='color:#c8cfdc'>Alineación a nivel de objetivo (sin RE específico)</span><br><span style='color:#c8cfdc'>RE op.: ${oeList}</span>`,ev))
+          .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",hideTip);
+        allLinks.push({path,op:ol.op,er:OBJ_PREFIX+obj,obj:obj,isObj:true});
+      });
+    });
+  }
+
+  // Calificación del RE (I.2): Fuerte si ops fuertes >= ops débiles (empate=Fuerte); si no, Débil.
+  const erRating={};
+  Object.keys(yER).forEach(er=>{
+    const opsER=[...new Set(rows.filter(r=>r.conn==="YES"&&r.er===er&&r.op_type==="A").map(r=>r.op))];
+    let sN=0,wN=0;
+    opsER.forEach(op=>{ (rows.some(r=>r.op===op&&r.er===er&&r.conn==="YES"&&r.align==="Strong")?sN++:wN++); });
+    erRating[er]= opsER.length===0 ? "Sin" : (sN>=wN ? "Fuerte" : "Débil");
+  });
+  // Calificación del objetivo (I.3): Fuerte si al menos un RE del objetivo es Fuerte.
+  const objFuerte={};
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>{ objFuerte[o.obj]=o.ers.some(er=>erRating[er]==="Fuerte"); }));
+  // Links ER -> Objetivo estratégico
+  objBox.forEach(ob=>{
+    STRATEGY.forEach(p=>p.objetivos.forEach(o=>{
+      if(o.obj!==ob.obj) return;
+      o.ers.forEach(er=>{ if(yER[er]===undefined) return;
+        const x1=colER+wER/2, y1=yER[er], x2=colObj-wObj/2, y2=ob.yc;
+        const p=linkLayer.append("path").attr("class","link").attr("d",curve(x1,y1,x2,y2))
+          .attr("stroke","#c59dd4").attr("stroke-width",2).attr("stroke-dasharray",(!isTC&&erRating[er]!=="Fuerte")?"4,4":null).attr("opacity",0.5);
+        allLinks.push({path:p, er:er, obj:ob.obj, isErObj:true});
+      });
+    }));
+  });
+
+  // Nodos: operaciones + círculos OE
+  opLayout.forEach(ol=>{
+    const g=svg.append("g").attr("data-node-op",ol.op);
+    const pipe = isPipeline(ol.op);
+    const opColor = pipe ? "#ffffff" : (ol.solaGris ? "#c9d2de" : "#1f4f8a");
+    g.append("rect").attr("class","node-rect").attr("x",colOps-wOps/2).attr("y",ol.yc-14).attr("width",wOps).attr("height",28).attr("rx",6)
+      .attr("fill",opColor).attr("opacity",pipe?1:(ol.solaGris?0.8:0.92))
+      .attr("stroke", pipe?"#1f4f8a":"none").attr("stroke-width", pipe?1.6:0);
+    g.append("text").attr("class","node-label").attr("x",colOps).attr("y",ol.yc+4).attr("text-anchor","middle").style("fill",pipe?"#1f4f8a":(ol.solaGris?"#1a2238":"#ffffff")).style("font-weight",700).text(ol.op);
+    if(!ol.solaGris) g.style("cursor","pointer")
+      .on("mouseover",ev=>{ hoverByOp(ol.op); })
+      .on("mouseout",()=>clearHover());
+    // círculos OE (los no alineados se dibujan sin línea, como círculos desconectados)
+    if(!isTC) ol.circles.forEach(c=>{
+      const rel=rows.filter(r=>r.op===c.op&&r.oe_id===c.oe_id&&r.conn==="YES");
+      const anyStrong=rel.some(r=>r.align==="Strong");
+      const col=anyStrong?"#1f4f8a":"#7fb2e5";
+      if(c.aligned){
+        // línea corta operación -> círculo
+        svg.append("path").attr("class","link shortlink").attr("data-circle-op",c.op).attr("d",curve(colOE+rCircle, c.y, colOps-wOps/2, ol.yc)).attr("stroke",col).attr("stroke-width",2).attr("stroke-dasharray",anyStrong?null:"4,4").attr("opacity",0.55);
+      }
+      const cg=svg.append("g").attr("data-circle-op",c.op).attr("data-circle-aligned", c.aligned?"1":"0");
+      cg.append("circle").attr("class","node-rect").attr("cx",colOE).attr("cy",c.y).attr("r",rCircle)
+        .attr("fill", c.aligned?col:"#e7e9ee").attr("opacity", c.aligned?0.92:0.9)
+        .attr("stroke", c.aligned?"none":"#9aa7bd").attr("stroke-width",1.2).attr("stroke-dasharray", c.aligned?null:"3,2");
+      cg.append("text").attr("class","oe-circle-label").attr("x",colOE).attr("y",c.y+3).attr("text-anchor","middle").style("fill", c.aligned?null:"#5d6b85").text(c.oe_id.replace("OE","RE"));
+      cg.style("cursor","pointer").on("mouseover",ev=>{ showTip(`<b>${c.op} · ${c.oe_id.replace("OE","RE")}</b><br>${c.oe}`+(c.aligned?"":"<br><span style='color:#f0c060'>RE sin alinear</span>"),ev); hoverByOp(c.op); })
+        .on("mousemove",ev=>showTip(tip.html(),ev))
+        .on("mouseout",()=>{ hideTip(); clearHover(); });
+    });
+  });
+
+  // Nodos ER  (los no alineados: mismo texto, fondo claro y borde punteado)
+  Object.keys(yER).forEach(er=>{
+    const al = ersData.has(er);
+    const g=svg.append("g").attr("data-node-er",er);
+    const _lines=wrapLabel(er,46,2);
+    const _h=_lines.length>1?42:28;
+    g.append("rect").attr("class","node-rect").attr("x",colER-wER/2).attr("y",yER[er]-_h/2).attr("width",wER).attr("height",_h).attr("rx",6)
+      .attr("fill", al?"#c59dd4":"#e7e9ee").attr("opacity", al?0.44:0.9)
+      .attr("stroke","#1f4f8a").attr("stroke-width",1.2).attr("stroke-dasharray", al?null:"4,3").attr("stroke-opacity", al?1:0.55);
+    const _ty=yER[er]-(_lines.length-1)*7+4;
+    _lines.forEach((ln,ix)=>g.append("text").attr("class","node-label").attr("x",colER-wER/2+8).attr("y",_ty+ix*14).text(ln));
+    g.style("cursor","pointer")
+     .on("mouseover",ev=>{ showTip(`<b>${er}</b>`+(al?"":"<br><span style='color:#f0c060'>Sin operaciones alineadas</span>"),ev); hoverByEr(er); })
+     .on("mousemove",ev=>showTip(tip.html(),ev))
+     .on("mouseout",()=>{ hideTip(); clearHover(); });
+  });
+
+  // Nodos Objetivo estratégico
+  const objOpCount={};  // obj -> nº de operaciones alineadas a nivel de objetivo
+  allLinks.forEach(l=>{ if(l.isObj){ (objOpCount[l.obj]=objOpCount[l.obj]||new Set()).add(l.op); } });
+  objBox.forEach(ob=>{
+    const alObj = (ob.aligned!==undefined) ? ob.aligned : true;
+    const g=svg.append("g").attr("data-node-obj",ob.obj);
+    g.append("rect").attr("class","node-rect").attr("x",colObj-wObj/2).attr("y",ob.yc-22).attr("width",wObj).attr("height",44).attr("rx",6)
+      .attr("fill", alObj?"#c4b799":"#e7e9ee").attr("opacity", alObj?0.28:0.9)
+      .attr("stroke", alObj?"none":"#1f4f8a").attr("stroke-width",1.2).attr("stroke-dasharray", alObj?null:"4,3").attr("stroke-opacity", alObj?1:0.55);
+    const label=ob.obj.length>84?ob.obj.slice(0,82)+"…":ob.obj;
+    g.append("text").attr("class","node-label").attr("x",colObj-wObj/2+8).attr("y",ob.yc-2).attr("font-weight",600).attr("fill",alObj?null:"#5d6b85").text(label.slice(0,42));
+    if(label.length>42) g.append("text").attr("class","node-label").attr("x",colObj-wObj/2+8).attr("y",ob.yc+12).attr("font-weight",600).attr("fill",alObj?null:"#5d6b85").text(label.slice(42,84));
+    // Badge "+N": nº de operaciones alineadas a este objetivo a nivel de objetivo (sin RE específico)
+    const nOps = objOpCount[ob.obj] ? objOpCount[ob.obj].size : 0;
+    g.style("cursor","pointer")
+     .on("mouseover",ev=>{ showTip(`<b>Objetivo estratégico:</b><br>${ob.obj}`+(nOps?`<br><span style='color:#c8cfdc'>${nOps} operación(es) alineada(s) a nivel de objetivo</span>`:"")+(alObj?"":"<br><span style='color:#f0c060'>Sin Resultados Esperados alineados</span>"),ev); hoverByObj(ob.obj); })
+     .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",()=>{ hideTip(); clearHover(); });
+    if(nOps>0){
+      const bg=svg.append("g").attr("class","obj-badge").attr("data-badge-obj",ob.obj).style("cursor","pointer");
+      const bx=colObj+wObj/2-13, by=ob.yc-22-2;
+      bg.append("circle").attr("cx",bx).attr("cy",by).attr("r",11);
+      bg.append("text").attr("x",bx).attr("y",by+3.5).attr("text-anchor","middle").text("+"+nOps);
+      bg.on("mouseover",ev=>{ showTip(`<b>+${nOps} operación(es)</b> alineada(s) a este objetivo a nivel de objetivo (sin RE específico). Pasá el mouse para ver cuáles.`,ev); hoverByObj(ob.obj); })
+        .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",()=>{ hideTip(); clearHover(); });
+    }
+  });
+
+  /* ===== Sistema de resaltado (hover) centralizado ===== */
+  function _dimAllExcept(opSet, erSet, objSet){
+    svg.selectAll("[data-node-op]").classed("node-dim", function(){ return !opSet.has(this.getAttribute("data-node-op")); });
+    svg.selectAll("[data-node-er]").classed("node-dim", function(){ return !erSet.has(this.getAttribute("data-node-er")); });
+    svg.selectAll("[data-node-obj]").classed("node-dim", function(){ return !objSet.has(this.getAttribute("data-node-obj")); });
+    // Circulitos RE de la operación: se atenúan si su operación no está activa.
+    svg.selectAll("g[data-circle-op]").classed("node-dim", function(){ return !opSet.has(this.getAttribute("data-circle-op")); });
+    // Líneas cortas op→círculo: igual criterio.
+    svg.selectAll("path.shortlink[data-circle-op]").classed("dim", function(){ return !opSet.has(this.getAttribute("data-circle-op")); });
+  }
+  function hoverByOp(op){ if(PIN) return; HOVERON=true;
+    // Primera pasada: RE y objetivos que toca la operación (por sus líneas op→RE y op→objetivo)
+    const erSet=new Set(), objSet=new Set();
+    allLinks.forEach(l=>{ if((l.isObj||!l.isErObj) && l.op===op){ if(l.isObj) objSet.add(l.obj); else erSet.add(l.er); } });
+    // También los objetivos dueños de los RE que toca la operación (cadena op→RE→objetivo)
+    erSet.forEach(er=>{ if(erIndex[er] && erIndex[er].obj) objSet.add(erIndex[er].obj); });
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isErObj) on = erSet.has(l.er);          // RE→obj: solo las de los RE que toca la op
+      else on = (l.op===op);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", on);
+    });
+    _dimAllExcept(new Set([op]), erSet, objSet);
+  }
+  function hoverByEr(er){ if(PIN) return; HOVERON=true;
+    const opSet=new Set();
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isErObj) on = (l.er===er);              // RE→obj de ESTE er
+      else if(l.isObj) on = false;                 // líneas op→objetivo: no
+      else on = (l.er===er);                       // op→RE de ESTE er
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", false);
+      if(on && !l.isErObj && !l.isObj) opSet.add(l.op);
+    });
+    const owner = erIndex[er] ? erIndex[er].obj : null;
+    _dimAllExcept(opSet, new Set([er]), owner?new Set([owner]):new Set());
+  }
+  function hoverByObj(obj){ if(PIN) return; HOVERON=true;
+    // Resalta TODA la cadena que llega a este objetivo: líneas directas op→objetivo,
+    // y también la cadena op→RE→objetivo de los RE que cuelgan de este objetivo.
+    const opSet=new Set(), erSet=new Set();
+    Object.keys(erIndex).forEach(er=>{ if(erIndex[er] && erIndex[er].obj===obj) erSet.add(er); });
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isObj) on = (l.obj===obj);
+      else if(l.isErObj) on = (l.obj===obj);
+      else on = erSet.has(l.er);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", on);
+      if(on){ if(l.op) opSet.add(l.op); if(l.er && !l.isObj) erSet.add(l.er); }
+    });
+    _dimAllExcept(opSet, erSet, new Set([obj]));
+  }
+  function clearHover(){ if(PIN) return; HOVERON=false;
+    allLinks.forEach(l=>{ l.path.classed("dim",false); if(l.isObj) l.path.classed("show",false); });
+    svg.selectAll(".node-dim").classed("node-dim",false);
+    svg.selectAll("path.shortlink").classed("dim",false);
+  }
+}
+
+/* Despacho: con COLOR_OE cargado usa la versión coloreada; vacío, la simple. */
+function drawSankey(svgId, rows){ return HAS_COLORS ? drawSankeyColor(svgId, rows) : drawSankeyBase(svgId, rows); }
+
+function drawSankeyColor(svgId, rows){
+  const svg=d3.select(svgId); svg.selectAll("*").remove();
+  PIN=false; HOVERON=false; svg.on("click", _chartClick);
+  if(rows.length===0){ svg.attr("viewBox","0 0 1180 200"); svg.append("text").attr("x",590).attr("y",100).attr("text-anchor","middle").attr("fill","var(--muted)").attr("font-size",15).text("No hay operaciones de este tipo."); return; }
+
+  const ops=(()=>{
+    const arr=[...new Set(rows.map(r=>r.op))];
+    const erIdx={}; let _k=0; STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>{ if(!(er in erIdx)) erIdx[er]=_k++; })));
+    const keyOf=op=>{ let m=Infinity; rows.forEach(r=>{ if(r.op===op&&r.conn==="YES"&&(r.er in erIdx)) m=Math.min(m,erIdx[r.er]); }); return m; };
+    return arr.map(op=>({op,k:keyOf(op)})).sort((a,b)=> (a.k-b.k) || (arr.indexOf(a.op)-arr.indexOf(b.op))).map(x=>x.op);
+  })();
+  const isTC = rows.every(r=>r.op_type==="B");   // pestaña de Cooperaciones Técnicas
+  // OE alineados (los que tienen al menos una conexión YES) -> círculos
+  const oeAll=[]; rows.forEach(r=>{const k=r.op+"|"+r.oe_id; if(!oeAll.find(o=>o.key===k)) oeAll.push({key:k,op:r.op,oe_id:r.oe_id,oe:r.oe});});
+  const oeConnected = oeAll.filter(o => rows.some(r=>r.op===o.op&&r.oe_id===o.oe_id&&r.conn==="YES"));
+  // Operaciones que no tienen NINGÚN OE alineado -> se muestran solas en gris
+  const opsAlineadas = new Set(oeConnected.map(o=>o.op));
+
+  // ER presentes en los datos (con alineación), ordenados por STRATEGY (pilar/obj)
+  const ersData = new Set(rows.filter(r=>r.conn==="YES"&&r.er&&r.er!=="None").map(r=>r.er));
+  // Estructura visible: TODA la estrategia (pilares/objetivos/ER), marcando cuáles quedaron sin alinear.
+  const erAligned = er => ersData.has(er);
+  const visPilares=[];
+  STRATEGY.forEach(p=>{
+    const objs=[];
+    p.objetivos.forEach(o=>{
+      const ers=o.ers.slice();                    // todos los ER del objetivo
+      const anyAl=ers.some(erAligned);
+      objs.push({obj:o.obj, ers, aligned:anyAl});  // objetivo sin alinear = ningún ER alineado
+    });
+    if(objs.length) visPilares.push({pilar:p.pilar, objetivos:objs});
+  });
+
+  // Layout
+  const rowH=50, padTop=90, padBot=40, gapObj=16, gapPilar=30, pilarLabelH=26, objLabelH=0;
+  const colOps=250, colOE=70, colER=770, colObj=1140;
+  const wOps=150, wER=330, wObj=250, rCircle=13;
+
+  // Y de ER (agrupados por pilar/obj), y posición de objetivos
+  const yER={}; const objBox=[]; const pilarBox=[];
+  let cursor=padTop;
+  visPilares.forEach(p=>{
+    const pTop=cursor;
+    cursor+=pilarLabelH;
+    p.objetivos.forEach(o=>{
+      const oTop=cursor;
+      o.ers.forEach((er,i)=>{ yER[er]=cursor+rowH/2; cursor+=rowH; });
+      const oBot=cursor;
+      objBox.push({obj:o.obj, top:oTop, bot:oBot, yc:(oTop+oBot)/2, pilar:p.pilar, aligned:o.aligned});
+      cursor+=gapObj;
+    });
+    cursor+=gapPilar;
+    pilarBox.push({pilar:p.pilar, top:pTop, bot:cursor-gapPilar});
+  });
+  const erBlockH=cursor;
+
+  // Y de operaciones y OE (columna izquierda): agrupar OE bajo su operación
+  // Cada operación ocupa el alto de sus OE-círculos (o 1 si va sola en gris)
+  const opLayout=[]; let oy=padTop;
+  ops.forEach(op=>{
+    // Todos los RE de la operación (alineados y no). Los no alineados se muestran como círculos desconectados.
+    const oesAll=oeAll.filter(o=>o.op===op && o.oe_id);
+    const alignedSet=new Set(oeConnected.filter(o=>o.op===op).map(o=>o.oe_id));
+    const oes=oesAll.map(o=>({...o, aligned:alignedSet.has(o.oe_id)}))
+                    .sort((a,b)=> (a.aligned===b.aligned?0:(a.aligned?-1:1)) || a.oe_id.localeCompare(b.oe_id,undefined,{numeric:true}));
+    const solaGris = !opsAlineadas.has(op);
+    const n = solaGris ? 1 : oes.length;
+    const blockTop=oy;
+    const circles=[];
+    if(!solaGris){
+      oes.forEach((o,i)=>{ circles.push({...o, y: oy + i*(rCircle*2+6) + rCircle}); });
+      oy += n*(rCircle*2+6) + 18;
+    } else {
+      oy += rowH + 10;
+    }
+    const blockBot=oy;
+    opLayout.push({op, solaGris, circles, yc:(blockTop+blockBot)/2 - (solaGris?0:0)});
+  });
+  const opsBlockH=oy;
+
+  const maxH=Math.max(erBlockH, opsBlockH, padTop) + padBot;
+  svg.attr("viewBox",`0 0 1300 ${maxH}`);
+  // Promedios continuos (solo tipo A). Ahora el color del ER de estrategia y sus líneas
+  // se calcula SOLO con los RE de operación efectivamente alineados a ese ER (op|oe_id),
+  // no con el promedio de toda la operación. Mezcla continua entre esos RE.
+  const erAvg={}, objAvg={};
+  // valores de los RE alineados a cada ER de estrategia: er -> [valores]
+  const erVals={};
+  if(!isTC){
+    rows.forEach(r=>{
+      if(r.conn!=="YES"||!r.er||r.er==="None") return;
+      // valor del RE específico; si el oe_id no tiene color propio, cae al promedio de la op
+      let v=oeValue(r.op,r.oe_id);
+      if(v==null) v=opMeanValue(r.op);
+      if(v==null) return;
+      (erVals[r.er]=erVals[r.er]||[]).push(v);
+    });
+    Object.keys(yER).forEach(er=>{
+      const vals=erVals[er]||[];
+      erAvg[er]= vals.length? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+    });
+    objBox.forEach(ob=>{
+      const ersObj=[]; STRATEGY.forEach(p=>p.objetivos.forEach(o=>{ if(o.obj===ob.obj) ersObj.push(...o.ers); }));
+      const vals=[]; ersObj.forEach(er=>{ (erVals[er]||[]).forEach(v=>vals.push(v)); });
+      objAvg[ob.obj]= vals.length? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+    });
+  }
+
+  // Encabezados
+  svg.append("text").attr("class","colhead").attr("x",colOps).attr("y",58).attr("text-anchor","middle").text("Operaciones");
+  if(!isTC){ const chOE=svg.append("text").attr("class","colhead").attr("x",colOE).attr("y",40).attr("text-anchor","middle"); chOE.append("tspan").attr("x",colOE).text("RESULTADO"); chOE.append("tspan").attr("x",colOE).attr("dy",13).text("ESPERADO DE LA"); chOE.append("tspan").attr("x",colOE).attr("dy",13).text("OPERACIÓN"); }
+  svg.append("text").attr("class","colhead").attr("x",colER).attr("y",58).attr("text-anchor","middle").text("Resultado esperado de la estrategia");
+  svg.append("text").attr("class","colhead").attr("x",colObj).attr("y",58).attr("text-anchor","middle").text("Objetivo estratégico");
+
+  // Bandas de pilar (fondo blanco) alrededor de los ER
+  pilarBox.forEach(pb=>{
+    svg.append("rect").attr("x",colER-wER/2-14).attr("y",pb.top-4).attr("width",(colObj+wObj/2)-(colER-wER/2)+28).attr("height",pb.bot-pb.top+8).attr("rx",12).attr("fill","#ffffff").attr("opacity",0.65);
+    svg.append("text").attr("class","pilar-label").attr("x",colER-wER/2-6).attr("y",pb.top+16).attr("fill","var(--accent)").text("PILAR: "+pb.pilar.toUpperCase().slice(0,95));
+  });
+
+  const linkLayer=svg.append("g");
+  const allLinks=[];
+
+  // Links Operación -> ER (una sola línea por operación y ER)
+  opLayout.forEach(ol=>{
+    if(ol.solaGris) return;
+    const ers=[...new Set(rows.filter(r=>r.op===ol.op && r.conn==="YES" && r.er && r.er!=="None" && yER[r.er]!==undefined).map(r=>r.er))];
+    ers.forEach(er=>{
+      const rel=rows.filter(r=>r.op===ol.op && r.er===er && r.conn==="YES");
+      // Color de la línea: mezcla continua de los RE de operación alineados a ESTE er.
+      let lineCol;
+      if(isTC){ lineCol=TC_HEX; }
+      else {
+        const vals=rel.map(r=>oeValue(r.op,r.oe_id)).filter(v=>v!=null);
+        const v = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : opMeanValue(ol.op);
+        lineCol = contHex(v);
+      }
+      const strong=rel.some(r=>r.align==="Strong");
+      const x1=colOps+wOps/2, y1=ol.yc, x2=colER-wER/2, y2=yER[er];
+      const oeList=rel.map(r=>r.oe_id.replace("OE","RE")).join(", ");
+      const _why=(rel.find(r=>r.align==="Strong")||rel.find(r=>r.reasoning&&r.reasoning.trim())||{}).reasoning||"";
+      const path=linkLayer.append("path").attr("class","link").attr("d",curve(x1,y1,x2,y2))
+        .attr("stroke",lineCol).attr("stroke-width",strong?3:1.6).attr("stroke-dasharray",(!isTC&&!strong)?"4,4":null).attr("opacity",0.8)
+        .attr("data-op",ol.op).attr("data-er",er);
+      path.on("mouseover",ev=>showTip(`<b>${ol.op}</b> → ${er}<br>Alineación: <b>${strong?"Strong":"Weak"}</b>`+(_why?`<br><br><span style='color:#dfe7f2'>${_why}</span>`:""),ev))
+        .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",hideTip);
+      allLinks.push({path,op:ol.op,er});
+    });
+  });
+
+  // Links Operación -> Objetivo (filas cuyo related_er es un Objetivo, no un RE)
+  if(SHOW_OBJ_LINKS){
+    const objYc={}; objBox.forEach(ob=>{ objYc[ob.obj]=ob.yc; });
+    opLayout.forEach(ol=>{
+      if(ol.solaGris) return;
+      const objsDir=[...new Set(rows.filter(r=>r.op===ol.op && r.conn==="YES" && isObjRef(r.er) && objYc[objOf(r.er)]!==undefined).map(r=>objOf(r.er)))];
+      objsDir.forEach(obj=>{
+        const rel=rows.filter(r=>r.op===ol.op && objOf(r.er)===obj && r.conn==="YES");
+        const strong=rel.some(r=>r.align==="Strong");
+        const vals=rel.map(r=>oeValue(r.op,r.oe_id)).filter(v=>v!=null);
+        const v = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : opMeanValue(ol.op);
+        const lineCol = isTC ? TC_HEX : contHex(v);
+        const x1=colOps+wOps/2, y1=ol.yc, xc=colObj-wObj/2-24, x2=colObj-wObj/2, y2=objYc[obj];
+        const d=`M${x1},${y1} C${xc},${y1} ${xc},${y2} ${x2},${y2}`;
+        const oeList=rel.map(r=>r.oe_id.replace("OE","RE")).filter(Boolean).join(", ")||"—";
+        const path=linkLayer.append("path").attr("class","link objlink").attr("d",d)
+          .attr("fill","none").attr("stroke",lineCol).attr("stroke-width",strong?1.6:1.2)
+          .attr("stroke-dasharray",(!isTC&&!strong)?"4,4":null)
+          .attr("data-op",ol.op).attr("data-obj",obj);
+        path.on("mouseover",ev=>showTip(`<b>${ol.op}</b> → <i>Objetivo</i>: ${obj}<br>Alineación: <b>${strong?"Strong":"Weak"}</b><br><span style='color:#c8cfdc'>Alineación a nivel de objetivo (sin RE específico)</span><br><span style='color:#c8cfdc'>RE op.: ${oeList}</span>`,ev))
+          .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",hideTip);
+        allLinks.push({path,op:ol.op,er:OBJ_PREFIX+obj,obj:obj,isObj:true});
+      });
+    });
+  }
+
+  // Calificación del RE (I.2): Fuerte si ops fuertes >= ops débiles (empate=Fuerte); si no, Débil.
+  const erRating={};
+  Object.keys(yER).forEach(er=>{
+    const opsER=[...new Set(rows.filter(r=>r.conn==="YES"&&r.er===er&&r.op_type==="A").map(r=>r.op))];
+    let sN=0,wN=0;
+    opsER.forEach(op=>{ (rows.some(r=>r.op===op&&r.er===er&&r.conn==="YES"&&r.align==="Strong")?sN++:wN++); });
+    erRating[er]= opsER.length===0 ? "Sin" : (sN>=wN ? "Fuerte" : "Débil");
+  });
+  // Calificación del objetivo (I.3): Fuerte si al menos un RE del objetivo es Fuerte.
+  const objFuerte={};
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>{ objFuerte[o.obj]=o.ers.some(er=>erRating[er]==="Fuerte"); }));
+  // Links ER -> Objetivo estratégico
+  objBox.forEach(ob=>{
+    STRATEGY.forEach(p=>p.objetivos.forEach(o=>{
+      if(o.obj!==ob.obj) return;
+      o.ers.forEach(er=>{ if(yER[er]===undefined) return;
+        const x1=colER+wER/2, y1=yER[er], x2=colObj-wObj/2, y2=ob.yc;
+        const p=linkLayer.append("path").attr("class","link").attr("d",curve(x1,y1,x2,y2))
+          .attr("stroke", isTC?"#c59dd4":contHex(erAvg[er])).attr("stroke-width",2).attr("stroke-dasharray",(!isTC&&erRating[er]!=="Fuerte")?"4,4":null).attr("opacity", isTC?0.5:0.72);
+        allLinks.push({path:p, er:er, obj:ob.obj, isErObj:true});
+      });
+    }));
+  });
+
+  // Nodos: operaciones + círculos OE
+  opLayout.forEach(ol=>{
+    const g=svg.append("g").attr("data-node-op",ol.op);
+    const pipe = isPipeline(ol.op);
+    const opName = isTC ? "TC" : opColorName(ol.op);
+    const opColor = pipe ? "#ffffff" : (isTC ? TC_HEX : PROB_HEX[opName]);
+    g.append("rect").attr("class","node-rect").attr("x",colOps-wOps/2).attr("y",ol.yc-14).attr("width",wOps).attr("height",28).attr("rx",6)
+      .attr("fill",opColor).attr("opacity",pipe?1:0.95)
+      .attr("stroke", pipe?"#1f4f8a":"none").attr("stroke-width", pipe?1.6:0);
+    g.append("text").attr("class","node-label").attr("x",colOps).attr("y",ol.yc+4).attr("text-anchor","middle").style("fill",pipe?"#1f4f8a":inkOn(opName,isTC)).style("font-weight",700).text(ol.op);
+    if(!ol.solaGris) g.style("cursor","pointer")
+      .on("mouseover",ev=>{ hoverByOp(ol.op); })
+      .on("mouseout",()=>clearHover());
+    // círculos OE (los no alineados se dibujan sin línea; conservan su color si lo tienen)
+    if(!isTC) ol.circles.forEach(c=>{
+      const rel=rows.filter(r=>r.op===c.op&&r.oe_id===c.oe_id&&r.conn==="YES");
+      const anyStrong=rel.some(r=>r.align==="Strong");
+      const cname = isTC ? "TC" : oeColorName(c.op,c.oe_id);
+      const col = isTC ? TC_HEX : PROB_HEX[cname];
+      const hasColor = cname!=="Gris";
+      if(c.aligned){
+        // línea corta operación -> círculo (punteada si el OE no tiene alineación fuerte)
+        svg.append("path").attr("class","link shortlink").attr("data-circle-op",c.op).attr("d",curve(colOE+rCircle, c.y, colOps-wOps/2, ol.yc)).attr("stroke",col).attr("stroke-width",2).attr("stroke-dasharray",anyStrong?null:"4,4").attr("opacity",0.6);
+      }
+      const cg=svg.append("g").attr("data-circle-op",c.op).attr("data-circle-aligned", c.aligned?"1":"0");
+      cg.append("circle").attr("class","node-rect").attr("cx",colOE).attr("cy",c.y).attr("r",rCircle)
+        .attr("fill", col).attr("opacity", c.aligned?0.95:(hasColor?0.85:0.9))
+        .attr("stroke", c.aligned?"none":"#9aa7bd").attr("stroke-width",1.2).attr("stroke-dasharray", c.aligned?null:"3,2");
+      cg.append("text").attr("class","oe-circle-label").attr("x",colOE).attr("y",c.y+3).attr("text-anchor","middle").style("fill",inkOn(cname,isTC)).text(c.oe_id.replace("OE","RE"));
+      cg.style("cursor","pointer").on("mouseover",ev=>{ showTip(`<b>${c.op} · ${c.oe_id.replace("OE","RE")}</b><br>${c.oe}`+(c.aligned?"":"<br><span style='color:#f0c060'>RE sin alinear</span>"),ev); hoverByOp(c.op); })
+        .on("mousemove",ev=>showTip(tip.html(),ev))
+        .on("mouseout",()=>{ hideTip(); clearHover(); });
+    });
+  });
+
+  // Nodos ER  (los no alineados: mismo texto, fondo claro y borde punteado)
+  Object.keys(yER).forEach(er=>{
+    const al = ersData.has(er);
+    const g=svg.append("g").attr("data-node-er",er);
+    const _lines=wrapLabel(er,46,2);
+    const _h=_lines.length>1?42:28;
+    g.append("rect").attr("class","node-rect").attr("x",colER-wER/2).attr("y",yER[er]-_h/2).attr("width",wER).attr("height",_h).attr("rx",6)
+      .attr("fill", al?(isTC?"#c59dd4":contHex(erAvg[er])):"#e7e9ee").attr("opacity", al?(isTC?0.44:0.9):0.9)
+      .attr("stroke","#1f4f8a").attr("stroke-width",1.2).attr("stroke-dasharray", al?null:"4,3").attr("stroke-opacity", al?1:0.55);
+    const _ty=yER[er]-(_lines.length-1)*7+4;
+    _lines.forEach((ln,ix)=>g.append("text").attr("class","node-label").attr("x",colER-wER/2+8).attr("y",_ty+ix*14).text(ln));
+    g.style("cursor","pointer")
+     .on("mouseover",ev=>{ showTip(`<b>${er}</b>`+(al?"":"<br><span style='color:#f0c060'>Sin operaciones alineadas</span>"),ev); hoverByEr(er); })
+     .on("mousemove",ev=>showTip(tip.html(),ev))
+     .on("mouseout",()=>{ hideTip(); clearHover(); });
+  });
+
+  // Nodos Objetivo estratégico
+  const objOpCount={};
+  allLinks.forEach(l=>{ if(l.isObj){ (objOpCount[l.obj]=objOpCount[l.obj]||new Set()).add(l.op); } });
+  objBox.forEach(ob=>{
+    const alObj = (ob.aligned!==undefined) ? ob.aligned : true;
+    const g=svg.append("g").attr("data-node-obj",ob.obj);
+    g.append("rect").attr("class","node-rect").attr("x",colObj-wObj/2).attr("y",ob.yc-22).attr("width",wObj).attr("height",44).attr("rx",6)
+      .attr("fill", alObj?(isTC?"#c4b799":contHex(objAvg[ob.obj])):"#e7e9ee").attr("opacity", alObj?(isTC?0.28:0.82):0.9)
+      .attr("stroke", alObj?"none":"#1f4f8a").attr("stroke-width",1.2).attr("stroke-dasharray", alObj?null:"4,3").attr("stroke-opacity", alObj?1:0.55);
+    const label=ob.obj.length>84?ob.obj.slice(0,82)+"…":ob.obj;
+    g.append("text").attr("class","node-label").attr("x",colObj-wObj/2+8).attr("y",ob.yc-2).attr("font-weight",600).attr("fill",alObj?null:"#5d6b85").text(label.slice(0,42));
+    if(label.length>42) g.append("text").attr("class","node-label").attr("x",colObj-wObj/2+8).attr("y",ob.yc+12).attr("font-weight",600).attr("fill",alObj?null:"#5d6b85").text(label.slice(42,84));
+    const nOps = objOpCount[ob.obj] ? objOpCount[ob.obj].size : 0;
+    g.style("cursor","pointer")
+     .on("mouseover",ev=>{ showTip(`<b>Objetivo estratégico:</b><br>${ob.obj}`+(nOps?`<br><span style='color:#c8cfdc'>${nOps} operación(es) alineada(s) a nivel de objetivo</span>`:"")+(alObj?"":"<br><span style='color:#f0c060'>Sin Resultados Esperados alineados</span>"),ev); hoverByObj(ob.obj); })
+     .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",()=>{ hideTip(); clearHover(); });
+    if(nOps>0){
+      const bg=svg.append("g").attr("class","obj-badge").attr("data-badge-obj",ob.obj).style("cursor","pointer");
+      const bx=colObj+wObj/2-13, by=ob.yc-22-2;
+      bg.append("circle").attr("cx",bx).attr("cy",by).attr("r",11);
+      bg.append("text").attr("x",bx).attr("y",by+3.5).attr("text-anchor","middle").text("+"+nOps);
+      bg.on("mouseover",ev=>{ showTip(`<b>+${nOps} operación(es)</b> alineada(s) a este objetivo a nivel de objetivo (sin RE específico). Pasá el mouse para ver cuáles.`,ev); hoverByObj(ob.obj); })
+        .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",()=>{ hideTip(); clearHover(); });
+    }
+  });
+
+  /* ===== Sistema de resaltado (hover) centralizado ===== */
+  function _dimAllExcept(opSet, erSet, objSet){
+    svg.selectAll("[data-node-op]").classed("node-dim", function(){ return !opSet.has(this.getAttribute("data-node-op")); });
+    svg.selectAll("[data-node-er]").classed("node-dim", function(){ return !erSet.has(this.getAttribute("data-node-er")); });
+    svg.selectAll("[data-node-obj]").classed("node-dim", function(){ return !objSet.has(this.getAttribute("data-node-obj")); });
+    // Circulitos RE de la operación: se atenúan si su operación no está activa.
+    svg.selectAll("g[data-circle-op]").classed("node-dim", function(){ return !opSet.has(this.getAttribute("data-circle-op")); });
+    // Líneas cortas op→círculo: igual criterio.
+    svg.selectAll("path.shortlink[data-circle-op]").classed("dim", function(){ return !opSet.has(this.getAttribute("data-circle-op")); });
+  }
+  function hoverByOp(op){ if(PIN) return; HOVERON=true;
+    const erSet=new Set(), objSet=new Set();
+    allLinks.forEach(l=>{ if((l.isObj||!l.isErObj) && l.op===op){ if(l.isObj) objSet.add(l.obj); else erSet.add(l.er); } });
+    erSet.forEach(er=>{ if(erIndex[er] && erIndex[er].obj) objSet.add(erIndex[er].obj); });
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isErObj) on = erSet.has(l.er);
+      else on = (l.op===op);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", on);
+    });
+    _dimAllExcept(new Set([op]), erSet, objSet);
+  }
+  function hoverByEr(er){ if(PIN) return; HOVERON=true;
+    const opSet=new Set();
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isErObj) on = (l.er===er);
+      else if(l.isObj) on = false;
+      else on = (l.er===er);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", false);
+      if(on && !l.isErObj && !l.isObj) opSet.add(l.op);
+    });
+    const owner = erIndex[er] ? erIndex[er].obj : null;
+    _dimAllExcept(opSet, new Set([er]), owner?new Set([owner]):new Set());
+  }
+  function hoverByObj(obj){ if(PIN) return; HOVERON=true;
+    // Resalta TODA la cadena que llega a este objetivo: líneas directas op→objetivo,
+    // y también la cadena op→RE→objetivo de los RE que cuelgan de este objetivo.
+    const opSet=new Set(), erSet=new Set();
+    Object.keys(erIndex).forEach(er=>{ if(erIndex[er] && erIndex[er].obj===obj) erSet.add(er); });
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isObj) on = (l.obj===obj);
+      else if(l.isErObj) on = (l.obj===obj);
+      else on = erSet.has(l.er);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", on);
+      if(on){ if(l.op) opSet.add(l.op); if(l.er && !l.isObj) erSet.add(l.er); }
+    });
+    _dimAllExcept(opSet, erSet, new Set([obj]));
+  }
+  function clearHover(){ if(PIN) return; HOVERON=false;
+    allLinks.forEach(l=>{ l.path.classed("dim",false); if(l.isObj) l.path.classed("show",false); });
+    svg.selectAll(".node-dim").classed("node-dim",false);
+    svg.selectAll("path.shortlink").classed("dim",false);
+  }
+}
+
+let drawnB=false;
+
+/* ===================== i18n (ES/EN) ===================== */
+var LANG = (function(){ try{ var e=document.getElementById('lang-src'); var v=e?e.textContent.trim():''; if(v && v.indexOf('@@')<0 && /ing/i.test(v)) return 'en'; }catch(x){} return 'es'; })();
+var _T = {
+  "Operaciones*":"Operations*","Cooperaciones Técnicas":"Technical Cooperations","Resumen por ER":"Summary by ER",
+  "Alineación agregada":"Aggregated alignment","Tabla completa":"Full table","Resumen ejecutivo":"Executive summary",
+  "📄 Cargar / reemplazar CSV del agente":"📄 Load / replace agent CSV","🎨 Cargar / reemplazar colores":"🎨 Load / replace colors",
+  "⬇ Descargar tabla (CSV para Excel)":"⬇ Download table (CSV for Excel)","📋 Copiar tabla":"📋 Copy table","⬇ Descargar (CSV para Excel)":"⬇ Download (CSV for Excel)",
+  "🔗 Alineaciones a objetivo: ON":"🔗 Objective-level alignments: ON","🔗 Alineaciones a objetivo: OFF":"🔗 Objective-level alignments: OFF",
+  "Datos precargados. Podés reemplazar el CSV del agente o los colores.":"Data preloaded. You can replace the agent CSV or the colors.",
+  "Operaciones":"Operations","Resultado esperado de la estrategia":"Strategy expected result","Objetivo estratégico":"Strategic objective",
+  "RESULTADO":"EXPECTED","ESPERADO DE LA":"RESULT OF THE","OPERACIÓN":"OPERATION",
+  "Operación":"Operation","Tipo":"Type","RE oper.":"Op. RE","Descripción RE":"RE description","ER estrategia":"Strategy ER",
+  "Pilar":"Pillar","Conex.":"Conn.","Factib.":"Feas.","Alineación":"Alignment","Justificación":"Rationale",
+  "Resultado Esperado (estrategia)":"Expected Result (strategy)","Cooperaciones":"Cooperations","Fuerte":"Strong","Débil":"Weak","Total":"Total",
+  "Tipo de operación":"Operation type","Cantidad":"Count","Operaciones (códigos)":"Operations (codes)","Total sin alineación":"Total unaligned",
+  "Ops. fuertes":"Strong ops","Ops. débiles":"Weak ops","Total alineadas":"Total aligned","Calificación del ER":"ER rating",
+  "Sin cobertura":"No coverage",
+  "Pilares en EBP":"Pillars in CS","Objetivos estratégicos en EBP":"Strategic objectives in CS",
+  "Resultados esperados en EBP":"Expected results in CS","Resultados esperados en EBP cubiertos":"Expected results in CS covered",
+  "Préstamos (INV + INV GR)*":"Loans (INV + INV GR)*",
+  "Operaciones sin alineación con la estrategia":"Operations with no alignment to the strategy"
+};
+var EN_HTML = {
+  "sub":"Each operation is broken down into its <strong>operation Expected Results (RE)</strong>, linked to the country strategy's <strong>Expected Results (ER)</strong>, grouped by Strategic Objective and Pillar. The lines show the degree of alignment.",
+  "intro_A":"<sup class=\"ast\">*</sup>Operations active since the approval of the Country Strategy (approved under the CS and inherited), per OVE criteria (loans, guarantees, grants). Hover over the circles (RE) to see the specific objective, and over the lines to see the rationale. <strong>Click to pin the highlight</strong> (useful to scroll without losing it); click again or on empty space to release. ",
+  "intro_B":"Technical Cooperations. Their alignment, when it exists, is of limited scope.",
+  "intro_noalin":"Operations whose classification found no link to any strategy Expected Result (all their rows with logical connection = NO).",
+  "intro_agregada":"Rating of each Expected Result based on its aligned operations: <strong>Strong</strong> if strongly-aligned operations are the majority or there is a tie (one strong and one weak counts as Strong); <strong>Weak</strong> if weakly-aligned operations predominate; <strong>No coverage</strong> if there are no aligned operations. The strategy objective is considered <strong>strong when at least one of its Expected Results is strong</strong> (reflected in the lines toward the objective). Technical Cooperations are not considered in this rating.",
+  "intro_resumenejec":"Executive summary of the portfolio–strategy alignment (generated in the flow).",
+  "legnote":"Probability of achievement per operation (portfolio review), scale 0–1: Low=0, Medium=0.5, High=1. Each operation's color comes from the aggregation rule over its Expected Results (RE); the color of the strategy's Expected Results and objectives is the simple average (0–1) of the aligned type-A operations with reviewed probability — thresholds: ≤0.25 low · 0.25–0.70 medium · ≥0.70 high. Technical Cooperations do not carry a probability color (light blue).",
+  "footer":"Source: exercise classifying the alignment of the portfolio with the country strategy's Expected Results. RE = operation Expected Result (specific objective). ER = strategy Expected Result.",
+  "leg1":"<span style=\"font-weight:700;color:var(--ink)\">Probability of achievement (operations):</span>",
+  "leg2":"<span class=\"dot\" style=\"background:var(--alta)\"></span> High",
+  "leg3":"<span class=\"dot\" style=\"background:var(--media)\"></span> Medium",
+  "leg4":"<span class=\"dot\" style=\"background:var(--baja)\"></span> Low",
+  "leg5":"<span class=\"dot\" style=\"background:var(--sinrev)\"></span> Not reviewed",
+  "leg6":"<span style=\"font-weight:700;color:var(--ink)\">Strategy ER / objective:</span> <span class=\"bar\"></span> average (continuous)",
+  "leg7":"<span class=\"dot\" style=\"background:var(--tc)\"></span> Technical Cooperation",
+  "leg8":"<span style=\"font-weight:700;color:var(--ink)\">Line:</span> <span class=\"sw\" style=\"border-top-color:#8a97ad\"></span> strong · <span class=\"sw\" style=\"border-top-color:#8a97ad;border-top-style:dashed\"></span> weak"
+};
+function translateUI(){
+  if(LANG!=='en') return;
+  try{
+    document.querySelectorAll('[data-i18n]').forEach(function(el){ var k=el.getAttribute('data-i18n'); if(EN_HTML[k]!=null) el.innerHTML=EN_HTML[k]; });
+    document.querySelectorAll('.tab, button.loadbtn, th, .badge, .stat .l, h2, #loadstatus').forEach(function(el){
+      var key=(el.textContent||'').trim(); if(_T[key]!=null) el.textContent=_T[key];
+    });
+    document.querySelectorAll('.colhead').forEach(function(el){
+      var tsp=el.querySelectorAll('tspan');
+      if(tsp.length){ tsp.forEach(function(t){ var k=(t.textContent||'').trim(); if(_T[k]!=null) t.textContent=_T[k]; }); }
+      else { var k=(el.textContent||'').trim(); if(_T[k]!=null) el.textContent=_T[k]; }
+    });
+    var h=document.getElementById('page-title');
+    if(h){ h.innerHTML=h.innerHTML.replace('Vinculación de la Estrategia de País con la Cartera','Country Strategy–Portfolio Alignment'); }
+    document.title=document.title.replace('Vinculación de la Estrategia de País con la Cartera','Country Strategy–Portfolio Alignment');
+  }catch(e){}
+}
+
+function renderAll(){
+  computeStats();
+  drawSankey("#chart-A", ROWS.filter(r=>r.op_type==="A"));
+  drawnB=false;
+  // si la pestaña B está activa, redibujar
+  if(document.getElementById("tab-B").classList.contains("active")){ drawSankey("#chart-B", ROWS.filter(r=>r.op_type==="B")); drawnB=true; }
+  buildTable();
+  buildResumen();
+  buildNoAlineadas();
+  buildDiag();
+  buildAgregada();
+  try{translateUI();}catch(e){}
+}
+drawSankey("#chart-A", ROWS.filter(r=>r.op_type==="A"));
+try{translateUI();}catch(e){}
+
+/* Toggle en vivo: muestra u oculta las alineaciones a nivel de Objetivo Estratégico. */
+function toggleObjLinks(){
+  SHOW_OBJ_LINKS = !SHOW_OBJ_LINKS;
+  var b=document.getElementById("toggleObj");
+  if(b) b.textContent = "🔗 Alineaciones a objetivo: " + (SHOW_OBJ_LINKS ? "ON" : "OFF");
+  renderAll();
+}
+
+// Tabla
+function buildTable(){
+  let rows="";
+  const sorted=ROWS.slice().sort((a,b)=>a.op.localeCompare(b.op)||a.oe_id.localeCompare(b.oe_id));
+  sorted.forEach(r=>{
+    const badge=r.align==="Strong"?'<span class="badge strong">Strong</span>':r.align==="Weak"?'<span class="badge weak">Weak</span>':'<span class="badge none">None</span>';
+    const meta=r.er&&r.er!=="None"&&erIndex[r.er]?erIndex[r.er].pilar:"—";
+    rows+=`<tr><td class="col-op">${r.op}</td><td class="col-num">${r.op_type}</td><td>${r.oe_id.replace("OE","RE")}</td><td>${r.oe||""}</td><td>${r.er||"None"}</td><td>${meta}</td><td class="col-num">${r.conn}</td><td class="col-num">${r.feas||"—"}</td><td>${badge}</td><td>${r.reasoning||""}</td></tr>`;
+  });
+  document.getElementById("align-table-wrap").innerHTML=`<table class="align-table"><thead><tr>
+    <th>Operación</th><th>Tipo</th><th>RE oper.</th><th>Descripción RE</th><th>ER estrategia</th><th>Pilar</th><th>Conex.</th><th>Factib.</th><th>Alineación</th><th>Justificación</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+buildTable();
+
+/* ====== TABLA RESUMEN por ER (fuerte/débil/total + códigos), A y B por separado ====== */
+function resumenData(){
+  const allER=[];
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>allER.push({er, pilar:p.pilar}))));
+  return allER.map(({er,pilar})=>{
+    const filas=ROWS.filter(r=>r.conn==="YES"&&r.er===er);
+    function agg(tipo){
+      const all=[...new Set(filas.filter(r=>r.op_type===tipo).map(r=>r.op))];
+      const strong=[...new Set(filas.filter(r=>r.op_type===tipo&&r.align==="Strong").map(r=>r.op))];
+      const weak=[...new Set(filas.filter(r=>r.op_type===tipo&&r.align==="Weak").map(r=>r.op))];
+      return {strong, weak, all};
+    }
+    return {er, pilar, A:agg("A"), B:agg("B")};
+  });
+}
+
+function buildResumen(){
+  const data=resumenData();
+  let rows=""; let currentPilar=null;
+  data.forEach(d=>{
+    if(d.pilar!==currentPilar){ currentPilar=d.pilar; rows+=`<tr class="pilar-row"><td colspan="7">${d.pilar}</td></tr>`; }
+    const aS=d.A.strong.length, aW=d.A.weak.length;
+    const bT=d.B.all.length;
+    const codesA=[...d.A.strong, ...d.A.weak].join(", ");
+    const codesB=d.B.all.join(", ");
+    rows+=`<tr>
+      <td class="er-cell">${d.er}</td>
+      <td class="col-num">${aS}</td><td class="col-num">${aW}</td><td class="col-num">${aS+aW}</td>
+      <td class="op-codes">${codesA||"—"}</td>
+      <td class="col-num">${bT}</td>
+      <td class="op-codes">${codesB||"—"}</td>
+    </tr>`;
+  });
+  document.getElementById("resumen-table-wrap").innerHTML=`
+    <table class="align-table resumen-table">
+      <thead>
+        <tr><th rowspan="2">Resultado Esperado (estrategia)</th>
+          <th colspan="4" style="text-align:center;">Operaciones</th>
+          <th colspan="2" style="text-align:center;">Cooperaciones Técnicas </th></tr>
+        <tr><th>Fuerte</th><th>Débil</th><th>Total</th><th>Operaciones </th>
+          <th>Total</th><th>Cooperaciones </th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+/* ====== DIAGNÓSTICO: related_er (conn=YES) que NO coinciden con la estrategia ======
+   Red de seguridad al cambiar de país o al correr de nuevo el agente. Lista las
+   cadenas que quedaron sin vincular para corregirlas en el agente o sumarlas a
+   ER_ALIASES. (Se evalúa después de canonicalER, así que solo marca lo que la
+   normalización no pudo resolver: reformulaciones reales, no diferencias de formato.) */
+function erDiagnostic(){
+  const stratSet=new Set();
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>stratSet.add(er))));
+  const misses={};
+  ROWS.forEach(r=>{
+    // Los ##OBJ## son alineaciones a nivel de Objetivo Estratégico (ya resueltas por canonicalER): NO son errores.
+    if(r.conn==="YES" && r.er && r.er!=="None" && !isObjRef(r.er) && !stratSet.has(r.er)){
+      (misses[r.er]=misses[r.er]||new Set()).add(r.op);
+    }
+  });
+  return Object.keys(misses).sort().map(er=>({er, ops:[...misses[er]].sort()}));
+}
+function buildDiag(){
+  const d=erDiagnostic();
+  if(d.length===0){
+    console.log("[diagnóstico ER] ✓ Todos los related_er con conexión coinciden con un ER de la estrategia.");
+    return;
+  }
+  console.warn("[diagnóstico ER] ⚠ "+d.length+" texto(s) de related_er sin coincidencia con la estrategia (quedaron SIN vincular). Corregir la redacción en el agente o agregar la variante a ER_ALIASES:");
+  d.forEach(x=>console.warn('  • "'+x.er+'"  ('+x.ops.length+' oper.: '+x.ops.join(", ")+')'));
+}
+
+/* ====== Operaciones SIN alineación (ninguna fila con conn=YES) ====== */
+function noAlineadasData(){
+  const allOps=[...new Set(ROWS.map(r=>r.op))];
+  const opType={}; ROWS.forEach(r=>{ opType[r.op]=r.op_type; });
+  const alineadas=new Set(ROWS.filter(r=>r.conn==="YES").map(r=>r.op));
+  const sin=allOps.filter(op=>!alineadas.has(op));
+  return { A:sin.filter(op=>opType[op]==="A").sort(), B:sin.filter(op=>opType[op]==="B").sort() };
+}
+function buildNoAlineadas(){
+  const {A,B}=noAlineadasData();
+  const fila=(tipo,codes)=>`<tr>
+      <td>${tipo}</td><td class="col-num">${codes.length}</td><td class="op-codes">${codes.join(", ")||"—"}</td>
+    </tr>`;
+  document.getElementById("noalin-table-wrap").innerHTML=`
+    <table class="align-table resumen-table">
+      <thead><tr><th>Tipo de operación</th><th>Cantidad</th><th>Operaciones (códigos)</th></tr></thead>
+      <tbody>
+        ${fila("Operaciones (préstamos, garantías, grants)",A)}
+        ${fila("Cooperaciones Técnicas",B)}
+        <tr class="pilar-row"><td>Total sin alineación</td><td class="col-num">${A.length+B.length}</td><td></td></tr>
+      </tbody>
+    </table>`;
+}
+
+function descargarResumenCSV(){
+  const data=resumenData();
+  let csv="Pilar,Resultado Esperado,A_Fuerte,A_Debil,A_Total,Operaciones_A,B_Total,Cooperaciones_B\n";
+  data.forEach(d=>{
+    const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+    csv+=[q(d.pilar),q(d.er),d.A.strong.length,d.A.weak.length,d.A.strong.length+d.A.weak.length,
+          q([...d.A.strong,...d.A.weak].join(", ")),
+          d.B.strong.length+d.B.weak.length,
+          q([...d.B.strong,...d.B.weak].join(", "))].join(",")+"\n";
+  });
+  bajarCSV(csv,"resumen_alineacion.csv","copystatus");
+}
+
+function bajarCSV(csv,nombre,statusId){
+  const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8;"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=nombre; a.click();
+  if(statusId) document.getElementById(statusId).textContent="✓ CSV descargado.";
+}
+
+// Copiar cualquier tabla al portapapeles (para Excel)
+function copiarTabla(selector, statusId){
+  const tabla=document.querySelector(selector);
+  if(!tabla) return;
+  const range=document.createRange(); range.selectNode(tabla);
+  const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  try{ document.execCommand("copy"); if(statusId) document.getElementById(statusId).textContent="✓ Tabla copiada — pegala en Excel."; }
+  catch(e){ if(statusId) document.getElementById(statusId).textContent="Seleccioná la tabla y copiá manualmente."; }
+  sel.removeAllRanges();
+}
+function copiarResumen(){ copiarTabla("#resumen-table-wrap table","copystatus"); }
+
+/* ====== TAB ALINEACIÓN AGREGADA — rating por ER (solo operaciones A) ====== */
+function agregadaData(){
+  // Para cada RE: calificación por operaciones A alineadas (I.2).
+  // Fuerte si ops fuertes >= ops débiles (empate -> Fuerte); Débil si débiles > fuertes; Sin cobertura si 0.
+  const allER=[];
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>allER.push({er, pilar:p.pilar}))));
+  return allER.map(({er,pilar})=>{
+    const filas=ROWS.filter(r=>r.conn==="YES"&&r.er===er&&r.op_type==="A");
+    const opsER=[...new Set(filas.map(r=>r.op))];
+    const strong=opsER.filter(op=>filas.some(r=>r.op===op&&r.align==="Strong"));
+    const weak=opsER.filter(op=>!filas.some(r=>r.op===op&&r.align==="Strong"));
+    const total=opsER.length;
+    let rating="Sin cobertura";
+    if(total>0) rating = (strong.length>=weak.length) ? "Fuerte" : "Débil";
+    return {er, pilar, nStrong:strong.length, nWeak:weak.length, total, rating};
+  });
+}
+function buildAgregada(){
+  const data=agregadaData();
+  let rows=""; let currentPilar=null;
+  data.forEach(d=>{
+    if(d.pilar!==currentPilar){ currentPilar=d.pilar; rows+=`<tr class="pilar-row"><td colspan="5">${d.pilar}</td></tr>`; }
+    const badge = d.rating==="Fuerte" ? '<span class="badge strong">Fuerte</span>'
+               : d.rating==="Débil" ? '<span class="badge weak">Débil</span>'
+               : '<span class="badge none">Sin cobertura</span>';
+    rows+=`<tr>
+      <td class="er-cell">${d.er}</td>
+      <td class="col-num">${d.nStrong}</td>
+      <td class="col-num">${d.nWeak}</td>
+      <td class="col-num">${d.total}</td>
+      <td>${badge}</td>
+    </tr>`;
+  });
+  document.getElementById("agregada-table-wrap").innerHTML=`
+    <table class="align-table resumen-table">
+      <thead><tr>
+        <th>Resultado Esperado (estrategia)</th>
+        <th>Ops. fuertes</th><th>Ops. débiles</th><th>Total alineadas</th>
+        <th>Calificación del ER</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+function descargarAgregadaCSV(){
+  const data=agregadaData();
+  let csv="Pilar,Resultado Esperado,Ops_Fuertes,Ops_Debiles,Total_Alineadas,Calificacion_ER\n";
+  data.forEach(d=>{
+    const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+    csv+=[q(d.pilar),q(d.er),d.nStrong,d.nWeak,d.total,q(d.rating)].join(",")+"\n";
+  });
+  bajarCSV(csv,"alineacion_agregada.csv","copystatus2");
+}
+buildResumen();
+buildNoAlineadas();
+buildDiag();
+buildAgregada();
+
+function parseAgentCSV(text){
+  var rows=parseCSV(text);
+  // normalizar filas: detectar nivel (OE/OP), proyecto y campos
+  var norm=[];
+  for(var i=0;i<rows.length;i++){
+    var r=rows[i]; if(!r||r.length<8) continue;
+    var nivel="", f=r;
+    if(r[0]==="OE"||r[0]==="OP"){ nivel=r[0]; f=r.slice(1); }
+    if(f.length<9) continue;
+    var proj=(f[0]||"").trim(); var _pl=proj.toLowerCase(); if(!proj||_pl==="project"||_pl==="nivel") continue;
+    norm.push({nivel:nivel, proj:proj, f:f});
+  }
+  // proyectos que tienen filas OE (Type A). Para esos, ignoramos las OP.
+  var conOE={}; norm.forEach(function(x){ if(x.nivel!=="OP") conOE[x.proj]=true; });
+  var out=[];
+  norm.forEach(function(x){
+    // filas OP solo se usan si el proyecto NO tiene filas OE (caso TC: solo OP)
+    if(x.nivel==="OP" && conOE[x.proj]) return;
+    var f=x.f;
+    out.push({op:x.proj, op_type:(/-T/i.test(x.proj)?"B":"A"), oe_id:(f[1]||"OE1").trim()||"OE1",
+      oe:(f[2]||"").trim(), er:canonicalER((f[5]||"None").trim()||"None"),
+      conn:(f[4]||"NO").trim().toUpperCase(), feas:(f[6]||"").trim(),
+      align:(f[7]||"").trim(), reasoning:(f[8]||"").trim()});
+  });
+  return out;
+}
+function buildStrategyFromFlat(text){
+  var lines=text.replace(/\r/g,'').split('\n'); var order=[]; var map={};
+  for(var i=0;i<lines.length;i++){ var ln=lines[i]; if(!ln.trim()) continue;
+    var p=ln.split('|'); if(p.length<3) continue;
+    var area=p[0].trim(), obj=p[1].trim(), er=p.slice(2).join('|').trim();
+    if(!area || area.toLowerCase()==='areaprioritaria') continue;
+    if(!map[area]){ map[area]={order:[],objs:{}}; order.push(area); }
+    if(!map[area].objs[obj]){ map[area].objs[obj]=[]; map[area].order.push(obj); }
+    if(er) map[area].objs[obj].push(er);
+  }
+  return order.map(function(a){ return {pilar:a, objetivos:map[a].order.map(function(o){ return {obj:o, ers:map[a].objs[o]}; })}; });
+}
+function initResumen(){
+  try{ var el=document.getElementById('resumen-src'), cont=document.getElementById('resumen-ejec-cont'),
+    btn=document.querySelector('[data-tab="resumenejec"]');
+    var t=el?el.textContent.trim():"";
+    if(t && !(t.charAt(0)==='@'&&t.charAt(1)==='@')){ if(cont) cont.textContent=t; }
+    else { if(cont) cont.textContent='El resumen ejecutivo se genera en el flujo. En esta vista no hay uno cargado.'; }
+  }catch(e){ console.log('resumen',e); }
+}
+function switchTab(name){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===name));
+  document.querySelectorAll(".tab-content").forEach(c=>c.classList.remove("active"));
+  document.getElementById("tab-"+name).classList.add("active");
+  applyLegend();
+  if(name==="B"&&!drawnB){ drawSankey("#chart-B", ROWS.filter(r=>r.op_type==="B")); drawnB=true; } try{translateUI();}catch(e){}
+}
+
+/* ============================================================
+   CARGA DE CSV — el usuario sube el output del agente y se redibuja.
+   Columnas esperadas: project,oe_id,oe_text,er_slot,logical_connection,
+                       related_er,feasibility,alignment,reasoning
+   ============================================================ */
+function parseCSV(text){
+  // Parser que respeta comillas dobles y saltos internos
+  const rows=[]; let i=0, field='', row=[], inQ=false;
+  text=text.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  while(i<text.length){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){ if(text[i+1]==='"'){ field+='"'; i+=2; continue; } inQ=false; i++; continue; }
+      field+=c; i++; continue;
+    } else {
+      if(c==='"'){ inQ=true; i++; continue; }
+      if(c===','){ row.push(field); field=''; i++; continue; }
+      if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; i++; continue; }
+      field+=c; i++; continue;
+    }
+  }
+  if(field.length||row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r=>r.length>1 || (r.length===1 && r[0].trim()!==''));
+}
+
+function inferType(op){ return /-T/i.test(op)?"B":"A"; }
+
+function csvToRows(text){
+  const parsed=parseCSV(text);
+  if(parsed.length<2) return [];
+  const header=parsed[0].map(h=>h.trim().toLowerCase());
+  const idx=name=>header.indexOf(name);
+  const iProj=idx("project"), iOe=idx("oe_id"), iOeT=idx("oe_text"),
+        iConn=idx("logical_connection"), iEr=idx("related_er"),
+        iFeas=idx("feasibility"), iAlign=idx("alignment"), iReason=idx("reasoning");
+  const out=[];
+  for(let k=1;k<parsed.length;k++){
+    const r=parsed[k]; if(!r[iProj]||r[iProj].trim()==='') continue;
+    const op=r[iProj].trim();
+    const conn=(r[iConn]||"").trim().toUpperCase();
+    let align=(iAlign>=0?r[iAlign]:"").trim();
+    // normalizar capitalización
+    const capital=s=>s?s.charAt(0).toUpperCase()+s.slice(1).toLowerCase():s;
+    align=capital(align);
+    let feas=capital((iFeas>=0?r[iFeas]:"").trim());
+    // TC sin alignment pero con conexión -> Weak
+    if(conn==="YES" && (!align||align==="")) align="Weak";
+    if(conn==="NO") align="None";
+    out.push({
+      op, op_type:inferType(op),
+      oe_id:(r[iOe]||"OE1").trim(),
+      oe:(iOeT>=0?r[iOeT]:"").trim(),
+      er:canonicalER(iEr>=0?r[iEr]:"None"),
+      conn:conn||"NO",
+      feas, align,
+      reasoning:(iReason>=0?r[iReason]:"").trim()
+    });
+  }
+  return out;
+}
+
+/* (Carga por CSV desactivada: los datos se embeben directamente en ROWS.) */
+
+/* Si no hay colores cargados, ocultar la leyenda de probabilidad. */
+applyLegend();
+
+/* ===== Carga de archivos (agente o colores) — a prueba de botón ===== */
+function _setStatus(msg, ok){
+  var el=document.getElementById("loadstatus"); if(!el) return;
+  el.textContent=msg;
+  el.style.color = ok===true ? "#1f7a44" : (ok===false ? "#b23b3b" : "");
+  el.style.fontWeight="600";
+}
+function loadCSVText(text, fname){
+  var h; try{ var p=parseCSV(text); h=p.length?p[0].map(function(x){return x.trim().toLowerCase();}):[]; }catch(e){ h=[]; }
+  var hasColor = h.indexOf("color")>=0;
+  var hasAgent = h.indexOf("related_er")>=0 || h.indexOf("oe_text")>=0 || h.indexOf("alignment")>=0;
+  try{
+    if(hasColor && !hasAgent){
+      COLOR_OE=csvToColors(text); rebuildColors(); applyLegend(); renderAll();
+      var n=Object.keys(COLOR_OE).length;
+      _setStatus("\u2713 Colores cargados desde "+fname+": "+n+" operaciones.", n>0);
+    } else if(hasAgent){
+      var rows=csvToRows(text);
+      if(!rows.length){ _setStatus("El CSV del agente no tiene filas válidas.", false); return; }
+      ROWS=rows; renderAll();
+      _setStatus("\u2713 Datos del agente cargados desde "+fname+": "+ROWS.length+" filas.", true);
+    } else {
+      _setStatus("No reconozco las columnas de "+fname+". Necesita 'color' (colores) o 'related_er' (agente).", false);
+    }
+  }catch(err){ _setStatus("Error al leer "+fname+": "+err.message, false); }
+}
+(function(){
+  ["csvfile","colorfile"].forEach(function(id){
+    var inp=document.getElementById(id); if(!inp) return;
+    inp.addEventListener("change",function(ev){
+      var file=ev.target.files && ev.target.files[0]; if(!file) return;
+      var reader=new FileReader();
+      reader.onload=function(e){ loadCSVText(e.target.result, file.name); };
+      reader.onerror=function(){ _setStatus("No se pudo leer el archivo.", false); };
+      reader.readAsText(file,"UTF-8");
+      ev.target.value="";   /* permite recargar el mismo archivo */
+    });
+  });
+})();
+
+initResumen();
+(function(){ var h=document.getElementById('page-title'); if(h && h.textContent.indexOf('@@')>=0){ var t=h.textContent.replace(/\s*[—-]\s*@@[^@]*@@\s*$/,''); h.textContent=t; document.title=t; } })();
+</script>
+
+</body>
+</html>

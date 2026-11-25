@@ -1,0 +1,1762 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vinculación de la Estrategia de País con la Cartera — Bahamas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#e6f2fb;--panel:#d5e8f5;--ink:#1a2238;--muted:#5d6b85;--line:#bcd4e6;
+    --viz-max:1300px; /* ancho máx. del diagrama: bajalo (ej. 1000px) para verlo más chico */
+    --strong:#1f4f8a;      /* azul oscuro: alineación fuerte */
+    --weak:#7fb2e5;        /* azul claro: alineación débil */
+    --none:#c9d2de;        /* gris: sin alineación */
+    --alta:#3fb96b;        /* verde: probabilidad de logro alta */
+    --media:#f2c14e;       /* amarillo: probabilidad media */
+    --baja:#e89b6e;        /* rojo/naranja: probabilidad baja */
+    --sinrev:#c2cad6;      /* gris: sin revisar */
+    --tc:#6cb2e4;          /* celeste: cooperaciones técnicas */
+    --accent:#1f4f8a;
+    --font:"Montserrat",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font);}
+  header{padding:24px 36px 14px;border-bottom:1px solid var(--line);background:#d5e8f5;}
+  h1{font-size:23px;margin:0 0 5px;font-weight:600;color:var(--ink);}
+  .sub{font-size:12.5px;color:var(--muted);line-height:1.5;max-width:1180px;font-weight:400;}
+  .loadbar{margin:14px 36px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .loadbtn{background:var(--accent);color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);transition:background .15s;}
+  .loadbtn:hover{background:#163a66;}
+  .resumen-actions{margin:16px 36px 0;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .loadbtn.secundario{background:#fff;color:var(--accent);border:1.5px solid var(--accent);}
+  .loadbtn.secundario:hover{background:#eaf3fb;}
+  table.resumen-table .er-cell{max-width:340px;}
+  table.resumen-table .op-codes{font-size:10.5px;color:var(--muted);}
+  .pilar-row td{background:#1f4f8a !important;color:#fff !important;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;}
+  table.align-table tr.pilar-row td, table.resumen-table tr.pilar-row td{color:#fff !important;background:#1f4f8a !important;}
+  #loadstatus{font-size:12px;color:var(--muted);font-style:italic;}
+  .stats{display:flex;gap:28px;flex-wrap:wrap;margin:14px 36px 4px;}
+  .stat .n{font-size:26px;font-weight:700;color:var(--ink);}
+  .stat .l{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:500;}
+  .stat .l sup.ast{color:var(--muted);font-weight:700;font-size:11px;}
+  .stats-foot{margin:2px 36px 8px;font-size:10.5px;color:var(--accent);font-style:italic;max-width:1180px;line-height:1.5;}
+  .legend{display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin:10px 36px 4px;font-size:12px;color:var(--muted);font-weight:400;}
+  .legend .grp{display:flex;gap:8px;align-items:center;}
+  .legend .sw{width:26px;height:0;border-top-width:3px;border-top-style:solid;}
+  .legend .dot{width:12px;height:12px;border-radius:50%;}
+  .legend .bar{width:80px;height:11px;border-radius:3px;display:inline-block;background:linear-gradient(90deg,#e0524d 0%,#ef8a4d 25%,#f2c14e 50%,#b6c84a 75%,#3fb96b 100%);}
+  svg{display:block;width:100%;max-width:var(--viz-max);background:transparent;font-family:var(--font);}
+  .node-label{font-size:11px;fill:var(--ink);cursor:default;font-weight:500;}
+  .oe-circle-label{font-size:9px;fill:#fff;font-weight:700;pointer-events:none;}
+  .node-rect{cursor:pointer;}
+  .link{fill:none;transition:opacity .18s;}
+  .dim{opacity:.06 !important;}
+  .objlink{opacity:0 !important;}            /* líneas op→objetivo ocultas en reposo */
+  .objlink.show{opacity:.85 !important;}     /* visibles al hover de su operación/objetivo */
+  .node-dim{opacity:.18 !important;transition:opacity .18s;}
+  .node-hi{stroke:#f0a030 !important;stroke-width:2.5 !important;}
+  .obj-badge{cursor:default;}
+  .obj-badge circle{fill:#1f4f8a;}
+  .obj-badge text{fill:#fff;font-size:10px;font-weight:700;}
+  .pilar-label{font-size:10.5px;font-weight:700;letter-spacing:.2px;}
+  .colhead{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.1px;fill:var(--accent);}
+  .tip{position:fixed;pointer-events:none;background:#1a2238;border:1px solid var(--line);border-radius:8px;padding:11px 14px;font-size:12px;color:#fff;max-width:440px;opacity:0;transition:opacity .12s;box-shadow:0 8px 26px rgba(0,0,0,.25);z-index:9;font-weight:400;line-height:1.45;}
+  footer{padding:14px 36px 30px;font-size:10.5px;color:var(--muted);border-top:1px solid var(--line);font-weight:400;}
+  .tabs{display:flex;gap:4px;margin:14px 36px 0;border-bottom:2px solid var(--line);}
+  .tab{padding:9px 20px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;border:2px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;background:transparent;transition:all .15s;font-family:var(--font);}
+  .tab:hover{color:var(--ink);background:rgba(31,79,138,.05);}
+  .tab.active{color:var(--accent);background:#fff;border-color:var(--line);border-bottom:2px solid #fff;margin-bottom:-2px;}
+  .tab-content{display:none;}
+  .tab-content.active{display:block;}
+  .tab-intro{margin:12px 36px 0;font-size:12px;color:var(--muted);font-style:italic;}
+  .align-table-wrap{margin:14px 36px 30px;overflow-x:auto;}
+  table.align-table{border-collapse:collapse;width:100%;font-size:11.5px;background:#fff;}
+  table.align-table th{background:var(--accent);color:#fff;font-weight:600;text-align:left;padding:8px 10px;border:1px solid #15375f;position:sticky;top:0;}
+  table.align-table td{padding:7px 10px;border:1px solid var(--line);vertical-align:top;line-height:1.4;color:var(--ink);}
+  table.align-table tr:nth-child(even) td{background:#f7fafd;}
+  .badge{display:inline-block;padding:3px 9px;border-radius:10px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+  .badge.strong{background:#1f4f8a;color:#fff;}
+  .badge.weak{background:#d3e6f8;color:#1f4f8a;}
+  .badge.none{background:#f2f2f2;color:#888;}
+  .col-op{font-weight:700;white-space:nowrap;}
+  .col-num{text-align:center;font-weight:600;}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="page-title">Vinculación de la Estrategia de País con la Cartera — Bahamas</h1>
+  <div class="sub" data-i18n="sub">Cada operación se despliega en sus <strong>Resultados Esperados de la operación (RE)</strong>, que se vinculan con los <strong>Resultados Esperados de la estrategia (ER)</strong>, agrupados por Objetivo Estratégico y Pilar. Las líneas indican el grado de alineación.</div>
+</header>
+
+<div style="margin:8px 36px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+  <label class="loadbtn" for="csvfile">📄 Cargar / reemplazar CSV del agente</label>
+  <input type="file" id="csvfile" accept=".csv,text/csv" style="display:none">
+  <label class="loadbtn secundario" for="colorfile">🎨 Cargar / reemplazar colores</label>
+  <input type="file" id="colorfile" accept=".csv,text/csv" style="display:none">
+  <span id="loadstatus">Datos precargados. Podés reemplazar el CSV del agente o los colores.</span>
+  <span id="colorstatus" style="font-size:12px;color:var(--muted);font-style:italic;"></span>
+  <button type="button" id="toggleObj" class="loadbtn secundario" onclick="toggleObjLinks()" title="Alterna si se muestran las alineaciones a nivel de Objetivo Estratégico">🔗 Alineaciones a objetivo: ON</button>
+</div>
+
+<div class="stats" id="stats"></div>
+<div class="stats-foot" id="stats-foot"></div>
+
+<div class="tabs">
+  <button class="tab active" data-tab="A" onclick="switchTab('A')">Operaciones*</button>
+  <button class="tab" data-tab="B" onclick="switchTab('B')">Cooperaciones Técnicas </button>
+  <button class="tab" data-tab="resumen" onclick="switchTab('resumen')">Resumen por ER</button>
+  <button class="tab" data-tab="agregada" onclick="switchTab('agregada')">Alineación agregada</button>
+  <button class="tab" data-tab="tabla" onclick="switchTab('tabla')">Tabla completa</button>
+  <button class="tab" data-tab="resumenejec" onclick="switchTab('resumenejec')">Resumen ejecutivo</button>
+</div>
+
+<div class="legend" id="legend">
+  <div class="grp" data-i18n="leg1"><span style="font-weight:700;color:var(--ink)">Probabilidad de logro (operaciones):</span></div>
+  <div class="grp" data-i18n="leg2"><span class="dot" style="background:var(--alta)"></span> Alta</div>
+  <div class="grp" data-i18n="leg3"><span class="dot" style="background:var(--media)"></span> Media</div>
+  <div class="grp" data-i18n="leg4"><span class="dot" style="background:var(--baja)"></span> Baja</div>
+  <div class="grp" data-i18n="leg5"><span class="dot" style="background:var(--sinrev)"></span> Sin revisar</div>
+  <div class="grp" data-i18n="leg6" style="margin-left:10px"><span style="font-weight:700;color:var(--ink)">RE de estrategia / objetivo:</span> <span class="bar"></span> promedio (continuo)</div>
+  <div class="grp" data-i18n="leg7" style="margin-left:10px"><span class="dot" style="background:var(--tc)"></span> Cooperación Técnica</div>
+  <div class="grp" data-i18n="leg8" style="margin-left:10px"><span style="font-weight:700;color:var(--ink)">Trazo:</span> <span class="sw" style="border-top-color:#8a97ad"></span> fuerte · <span class="sw" style="border-top-color:#8a97ad;border-top-style:dashed"></span> débil</div>
+</div>
+<div id="legend-note" data-i18n="legnote" style="margin:2px 36px 6px;font-size:11px;color:var(--muted);font-style:italic;max-width:1180px;line-height:1.5;">Probabilidad de logro por operación (revisión de cartera), escala 0–1: Baja=0, Media=0.5, Alta=1. El color de cada operación surge de la regla de agregación sobre sus Resultados Esperados (RE); el de los Resultados Esperados de la estrategia y los objetivos es el promedio simple (0–1) de las operaciones tipo A alineadas con probabilidad revisada — umbrales: ≤0.25 baja · 0.25–0.70 media · ≥0.70 alta. Las Cooperaciones Técnicas no llevan color de probabilidad (celeste).</div>
+
+<div class="tab-content active" id="tab-A">
+  <div class="tab-intro" data-i18n="intro_A"><sup class="ast">*</sup>Operaciones activas desde la aprobación de la EBP (aprobadas bajo la EBP y heredadas) de acuerdo con los criterios de OVE (préstamos, garantías, grants). Pase el cursor sobre los círculos (RE) para ver el objetivo específico, y sobre las líneas para ver la justificación. <strong>Hacé clic para fijar lo resaltado</strong> (útil para scrollear sin perderlo); clic de nuevo o en un espacio vacío para soltar. </div>
+  <svg id="chart-A"></svg>
+</div>
+<div class="tab-content" id="tab-B">
+  <div class="tab-intro" data-i18n="intro_B">Cooperaciones Técnicas. Su alineación, cuando existe, es de alcance acotado.</div>
+  <svg id="chart-B"></svg>
+</div>
+<div class="tab-content" id="tab-resumen">
+  <div class="resumen-actions">
+    <button class="loadbtn" onclick="descargarResumenCSV()">⬇ Descargar tabla (CSV para Excel)</button>
+    <button class="loadbtn secundario" onclick="copiarResumen()">📋 Copiar tabla</button>
+    <span id="copystatus" style="font-size:12px;color:var(--muted);font-style:italic;"></span>
+  </div>
+  <div class="align-table-wrap" id="resumen-table-wrap"></div>
+  <h2 style="margin:26px 36px 0;font-size:14.5px;font-weight:600;color:var(--ink);">Operaciones sin alineación con la estrategia</h2>
+  <div class="tab-intro" data-i18n="intro_noalin">Operaciones cuya clasificación no arrojó ninguna vinculación con un Resultado Esperado de la estrategia (todas sus filas con conexión lógica = NO).</div>
+  <div class="align-table-wrap" id="noalin-table-wrap"></div>
+</div>
+<div class="tab-content" id="tab-agregada">
+  <div class="resumen-actions">
+    <button class="loadbtn" onclick="descargarAgregadaCSV()">⬇ Descargar (CSV para Excel)</button>
+    <button class="loadbtn secundario" onclick="copiarTabla('#agregada-table-wrap table','copystatus2')">📋 Copiar tabla</button>
+    <span id="copystatus2" style="font-size:12px;color:var(--muted);font-style:italic;"></span>
+  </div>
+  <div class="tab-intro" data-i18n="intro_agregada">Calificación de cada Resultado Esperado según sus operaciones alineadas: <strong>Fuerte</strong> si las operaciones de alineación fuerte son mayoría o hay empate (una fuerte y una débil cuenta como Fuerte); <strong>Débil</strong> si predominan las de alineación débil; <strong>Sin cobertura</strong> si no hay operaciones alineadas. El objetivo de la estrategia se considera <strong>fuerte cuando al menos uno de sus Resultados Esperados es fuerte</strong> (se refleja en las líneas hacia el objetivo). Las Cooperaciones Técnicas no se consideran en esta calificación.</div>
+  <div class="align-table-wrap" id="agregada-table-wrap"></div>
+</div>
+<div class="tab-content" id="tab-tabla">
+  <div class="resumen-actions">
+    <button class="loadbtn secundario" onclick="copiarTabla('#align-table-wrap table','copystatus3')">📋 Copiar tabla</button>
+    <span id="copystatus3" style="font-size:12px;color:var(--muted);font-style:italic;"></span>
+  </div>
+  <div class="align-table-wrap" id="align-table-wrap"></div>
+</div>
+
+<div class="tip" id="tip"></div>
+<footer data-i18n="footer">Fuente: ejercicio de clasificación de alineación de la cartera con los Resultados Esperados de la estrategia de país. RE = Resultado Esperado de la operación (objetivo específico). ER = Resultado Esperado de la estrategia.</footer>
+
+<!-- Inyección desde el flujo (Power Automate reemplaza estos marcadores). Si no se reemplazan, se usan los datos embebidos. -->
+<script type="text/plain" id="estrategia-src">Disaster risk management|Strengthen the country’s resilience to disaster and climate change|Improved governance for disaster risk management
+Strengthening public sector governance|Improve the central government’s public financial management|Improved fiscal balances, and strengthen debt and state-owned enterprise management
+Strengthening public sector governance|Improve government effectiveness and responsiveness, and the quality of public services|Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure
+Boosting private sector competitiveness|Improve the business climate|Expanded access to financial resources for investment and resiliency by the productive sector
+Boosting private sector competitiveness|Improve the business climate|Improved labor market outcomes for females
+Boosting private sector competitiveness|Promote investments in sustainable infrastructure|Reduced reliance on fossil fuels
+Human development and citizen security|Improve access to and quality of basic services|Improved access to health services with a focus on preventative care
+Human development and citizen security|Improve access to and quality of basic services|Strengthened framework for public-private partnerships for resilient social infrastructure
+Human development and citizen security|Reduce violent crime, especially crime against women|Violence and gender dimensions incorporated into education programs</script>
+<script type="text/plain" id="datos-src">nivel, project, oe_id, oe_text, er_slot, logical_connection, related_er, feasibility, alignment, reasoning
+OE,BH-G0003,OE1,Adoption of resilient solar PV technologies,ER1,YES,Reduced reliance on fossil fuels,High,Strong,"Under the 'Promote investments in sustainable infrastructure' objective; promoting solar PV directly displaces fossil-based generation, supported by RE generation and service availability indicators."
+OE,BH-G0003,OE2,Local skills for solar PV services with female participation,ER1,YES,Improved labor market outcomes for females,Low,Weak,"Under the 'Improve the business climate' objective; training and internships for women in solar PV services can enhance female labor outcomes, though effects on employment and earnings are indirect."
+OP,BH-G0003,,,,YES,Reduced reliance on fossil fuels,High,Strong,At least one specific objective aligns strongly with this result under the sustainable infrastructure objective.
+OP,BH-G0003,,,,YES,Improved labor market outcomes for females,Low,Weak,One specific objective connects weakly to this result under the business climate objective via female-focused skills development.
+OE,BH-G0004,OE1,Strengthen health system and access,ER1,YES,Improved access to health services with a focus on preventative care,Low,Weak,"Under the basic services objective (SO 6), the general objective states 'support the strengthening of The Bahamas health system' and 'ensuring equal universal access to health care for all', and division SCL/HNP confirms the health sector, though preventative care is not explicit."
+OP,BH-G0004,,,,YES,Improved access to health services with a focus on preventative care,Low,Weak,"The general objective targets strengthening the health system and universal access, which connects to improved access to health services under SO 6."
+OE,BH-L1035,OE1,Planning and performance monitoring,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",Low,Weak,"Under the objective to improve government effectiveness and public services, strengthening planning and performance monitoring contributes to governance structure but does not by itself evidence the full digitalization and skills result (SO 3, RE 3.1)."
+OE,BH-L1035,OE2,National statistics,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",Low,Weak,"Under the objective to improve government effectiveness and public services, enhancing national statistics capacity supports governance structures but falls short of directly evidencing digitalization and civil-service skills (SO 3, RE 3.1)."
+OE,BH-L1035,OE3,Public Financial Management (PFM),ER1,YES,"Improved fiscal balances, and strengthen debt and state-owned enterprise management",High,Strong,"Under the objective to improve central government public financial management, strengthening PFM and integrated financial systems can directly improve fiscal balances (SO 2, RE 2.1)."
+OE,BH-L1035,OE3,Public Financial Management (PFM),ER2,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",Low,Weak,"Under the objective to improve government effectiveness and public services, strengthening PFM systems supports governance structures but does not by itself achieve the broad digitalization and skills result (SO 3, RE 3.1)."
+OE,BH-L1035,OE4,Public procurement system,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",Low,Weak,"Under the objective to improve government effectiveness and public services, procurement system reforms strengthen governance structures but do not alone evidence sector-wide digitalization and skills (SO 3, RE 3.1)."
+OP,BH-L1035,,,,YES,"Improved fiscal balances, and strengthen debt and state-owned enterprise management",High,Strong,"At least one specific objective aligns strongly and feasibly with improved fiscal balances under the public financial management objective (SO 2, RE 2.1)."
+OP,BH-L1035,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",Low,Weak,"Multiple specific objectives contribute to governance structure under the government effectiveness objective, but none alone evidences the full digitalization and skills result (SO 3, RE 3.1)."
+OE,BH-L1041,OE1,Travel time savings,SO1,YES,Promote investments in sustainable infrastructure,Low,Weak,"Under the sustainable infrastructure objective; the closest result is 'Reduced reliance on fossil fuels', but airport upgrades for connectivity and travel time do not target energy sources, so no specific result is evidenced."
+OP,BH-L1041,,,,YES,Promote investments in sustainable infrastructure,Low,Weak,The specific objective connects generally to the sustainable infrastructure objective without evidencing any of its specific results.
+OE,BH-L1043,OE1,Sustainable coastal protection infrastructure,SO1,YES,Strengthen the country’s resilience to disaster and climate change,Low,Weak,"Under the disaster and climate resilience objective (SO 1), this OE builds coastal protection infrastructure; the closest result is 'Improved governance for disaster risk management', which it does not evidence because it focuses on works rather than governance."
+OE,BH-L1043,OE2,Natural infrastructure for hazard resilience in Andros,SO1,YES,Strengthen the country’s resilience to disaster and climate change,Low,Weak,"Under the disaster and climate resilience objective (SO 1), restoring mangroves and reefs acts upon resilience; the nearest result is 'Improved governance for disaster risk management', which is not evidenced since this OE delivers nature-based works, not governance changes."
+OE,BH-L1043,OE3,Institutional strengthening for coastal risk management,ER1,YES,Improved governance for disaster risk management,High,Strong,"Under SO 1, this OE strengthens governance for coastal risk management in public agencies, directly evidencing improved governance for disaster risk management."
+OE,BH-L1043,OE3,Institutional strengthening for coastal risk management,ER2,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",Low,Weak,"Under SO 3, this OE targets technological and managerial tools and capacity in public agencies, which relates to digitalization and skills, though its primary sectoral aim is DRM."
+OP,BH-L1043,,,,YES,Improved governance for disaster risk management,High,Strong,At least one specific objective aligns strongly with this result under the disaster and climate resilience objective.
+OP,BH-L1043,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",Low,Weak,"Institutional strengthening includes technological and managerial tools and skills in public agencies, connecting weakly to this cross-cutting digitalization result."
+OE,BH-L1045,OE1,Uso de servicios gubernamentales en linea,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",High,Strong,"Under the objective to improve government effectiveness and responsiveness and the quality of public services, increasing the percentage of people using government online services directly advances public sector digitalization measured by this result."
+OE,BH-L1045,OE2,Interoperabilidad e intercambio de informacion,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",High,Strong,"Under the objective to improve government effectiveness and responsiveness and the quality of public services, increasing information sharing via an interoperability platform strengthens digital infrastructure and governance structures as captured by this result."
+OP,BH-L1045,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",High,Strong,At least one specific objective aligns strongly with this result.
+OE,BH-L1046,OE1,Access to finance for MSMEs enhanced,ER1,YES,Expanded access to financial resources for investment and resiliency by the productive sector,High,Strong,"Under the business climate objective, enhancing access to finance of MSMEs via a credit enhancement facility directly increases financing available to the productive sector, supported by indicators on guaranteed loans and credit success."
+OP,BH-L1046,,,,YES,Expanded access to financial resources for investment and resiliency by the productive sector,High,Strong,A specific objective aligns strongly with this business climate result through expanded MSME financing.
+OE,BH-L1048,OE1,Rehabilitacion T&D e instalacion de RE en Abaco y EGB,ER1,YES,Reduced reliance on fossil fuels,High,Strong,"Under the objective to promote investments in sustainable infrastructure (SO5), restoring T&D and installing resilient RE capacity directly increases renewable generation and reduces reliance on fossil fuels."
+OE,BH-L1048,OE2,Adopcion de tecnologia solar PV en islas familiares,ER1,YES,Reduced reliance on fossil fuels,High,Strong,"Under the objective to promote investments in sustainable infrastructure (SO5), promoting PV adoption expands renewable capacity and reduces fossil fuel dependence."
+OE,BH-L1048,OE3,Mejora del marco regulatorio y mecanismos para RE,ER1,YES,Reduced reliance on fossil fuels,Low,Weak,"Under the objective to promote investments in sustainable infrastructure (SO5), strengthening regulations and deployment mechanisms enables RE uptake that reduces fossil fuel use but does not by itself ensure it."
+OE,BH-L1048,OE3,Mejora del marco regulatorio y mecanismos para RE,ER2,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",Low,Weak,"Under the objective to improve government effectiveness and public services (SO3), URCA as a public-sector regulator approving RE regulation and establishing the RE Entity strengthen governance structure, though not evidencing digitalization or civil service skills."
+OP,BH-L1048,,,,YES,Reduced reliance on fossil fuels,High,Strong,"Multiple specific objectives expand and enable renewable energy, reducing reliance on fossil fuels under the sustainable infrastructure objective."
+OP,BH-L1048,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",Low,Weak,Regulatory approvals by a public regulator and establishing the RE Entity strengthen governance structure under the government effectiveness objective.
+OE,BH-L1053,OE1,Integracion de servicios de atencion primaria y secundaria,ER1,YES,Improved access to health services with a focus on preventative care,High,Strong,"Under the basic services objective (health), integrating services delivered by public health entities (DPH, PHA, NHIA) and training in HEARTS directly improves access and preventative care."
+OE,BH-L1053,OE2,"Mejorar acceso, cobertura y calidad de servicios de salud",ER1,YES,Improved access to health services with a focus on preventative care,High,Strong,"Under the basic services objective (health), the OE explicitly targets improved access, coverage, and quality of community, ambulatory, and hospital services."
+OE,BH-L1053,OE3,Aumentar la eficiencia de los servicios de salud,ER1,YES,Improved access to health services with a focus on preventative care,Low,Weak,"Under the basic services objective (health), increased efficiency via digital tools can support access and quality but does not by itself ensure improved access to preventative care."
+OE,BH-L1053,OE3,Aumentar la eficiencia de los servicios de salud,ER2,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",Low,Weak,"Under the government effectiveness objective, this OE targets health information systems, EMRs, and digital health technology, which are forms of public sector digitalization."
+OP,BH-L1053,,,,YES,Improved access to health services with a focus on preventative care,High,Strong,Multiple specific objectives directly target improved access and quality of health services with a focus on preventative care.
+OP,BH-L1053,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",Low,Weak,One specific objective contributes to public sector digitalization through health information systems and EMRs.
+OE,BH-L1055,OE1,Response leadership strengthened,ER1,YES,Improved governance for disaster risk management,High,Strong,"Under the disaster and climate resilience objective, reinforcing national response leadership and an Emergency Operations Committee evidences improved governance for disaster risk management."
+OE,BH-L1055,OE2,Case detection and monitoring improved,ER1,YES,Improved access to health services with a focus on preventative care,Low,Weak,"Under the basic services objective, enhancing surveillance through regular epidemiological bulletins and lab diagnostic capacity supports preventative care but does not by itself guarantee improved access."
+OE,BH-L1055,OE3,Break transmission of the illness,ER1,YES,Improved access to health services with a focus on preventative care,High,Strong,"Under the basic services objective, vaccination of prioritized groups and surveillance at points of entry directly provide preventative health services, improving access."
+OE,BH-L1055,OE4,Service delivery capacity improved,ER1,YES,Improved access to health services with a focus on preventative care,High,Strong,"Under the basic services objective, increasing isolation and triage capacity in acute facilities expands the availability of services, improving access."
+OP,BH-L1055,,,,YES,Improved governance for disaster risk management,High,Strong,"One specific objective strongly strengthens national emergency leadership and coordination, evidencing this result."
+OP,BH-L1055,,,,YES,Improved access to health services with a focus on preventative care,High,Strong,"Multiple specific objectives increase preventative service provision and capacity, including vaccination and expanded facility capabilities."
+OE,BH-L1057,OE1,Reliability and efficiency of electricity service,SO1,YES,Promote investments in sustainable infrastructure,Low,Weak,"Under the sustainable infrastructure objective, the words 'improvement of the reliability and efficiency of the electricity service' and division INE/ENE indicate action on energy infrastructure; the closest result is 'Reduced reliance on fossil fuels', which is not evidenced by this general objective."
+OP,BH-L1057,,,,YES,Promote investments in sustainable infrastructure,Low,Weak,"The general objective targets reliability and efficiency of the electricity service, connecting at a general level to the sustainable infrastructure objective without evidencing a specific result."
+OE,BH-L1058,OE1,Promote SME growth in Blue Economy and related sectors,SO1,YES,Improve the business climate,Low,Weak,"Under the business climate objective, the general objective mentions 'promotion of growth among Small and Medium-sized enterprises (SMEs)' and division PTI/CTI confirms the productive sector focus, but it does not specify access to finance or female labor outcomes, so the nearest results (Expanded access to financial resources for investment and resiliency by the productive sector; Improved labor market outcomes for females) are not evidenced."
+OP,BH-L1058,,,,YES,Improve the business climate,Low,Weak,"The general objective targets SME growth consistent with the business climate objective, but does not evidence a specific result under it."
+OE,BH-L1061,OE1,Mejorar cobertura y confiabilidad de agua y saneamiento,SO1,YES,Improve access to and quality of basic services,Low,Weak,"Under the basic services objective (SO 6), the closest results are on health access and PPP frameworks, but this OE acts on water and wastewater services rather than health services or PPPs."
+OE,BH-L1061,OE2,Mejorar desempeno operativo y financiero de WSC,ER1,YES,"Improved fiscal balances, and strengthen debt and state-owned enterprise management",Low,Weak,"Under the public financial management objective (SO 2), improving the financial performance of WSC, a public utility, contributes to strengthened SOE management though it is not sufficient to move overall fiscal balances by itself."
+OE,BH-L1061,OE2,Mejorar desempeno operativo y financiero de WSC,SO2,YES,Improve access to and quality of basic services,Low,Weak,"Under the basic services objective (SO 6), the nearest results concern health access and PPPs, while this OE improves efficiency of water services without directly evidencing those results."
+OE,BH-L1061,OE3,Mejorar la gobernanza de WSC y del sector,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",Low,Weak,"Under the government effectiveness objective (SO 3), strengthening WSC’s governance structure aligns with the governance-structure element of this result even if it does not cover system-wide digitalization or skills."
+OE,BH-L1061,OE3,Mejorar la gobernanza de WSC y del sector,SO2,YES,Improve access to and quality of basic services,Low,Weak,"Under the basic services objective (SO 6), the closest results are on health access and PPPs, whereas this OE focuses on governance of water and sanitation rather than those specific results."
+OP,BH-L1061,,,,YES,"Improved fiscal balances, and strengthen debt and state-owned enterprise management",Low,Weak,"At least one specific objective improves a public SOE’s financial performance, contributing to strengthened SOE management."
+OP,BH-L1061,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",Low,Weak,"A specific objective strengthens governance structures in a public entity, aligning with the governance-structure component of this result."
+OP,BH-L1061,,,,YES,Improve access to and quality of basic services,Low,Weak,"Specific objectives act upon water and sanitation services, connecting to the basic services objective without evidencing a specific result under it."
+OE,BH-L1062,OE1,Governance for DRM - General Framework,ER1,YES,Improved governance for disaster risk management,High,Strong,"Under SO 1 to strengthen resilience to disaster and climate change, this OE explicitly targets governance improvements for DRM’s general framework, directly evidencing improved DRM governance."
+OE,BH-L1062,OE2,Governance for DRM - Risk Identification,ER1,YES,Improved governance for disaster risk management,High,Strong,"Under SO 1 to strengthen resilience to disaster and climate change, supporting governance for risk identification directly evidences improved DRM governance."
+OE,BH-L1062,OE3,Governance for DRM - Risk Reduction,ER1,YES,Improved governance for disaster risk management,High,Strong,"Under SO 1 to strengthen resilience to disaster and climate change, strengthening governance for risk reduction directly evidences improved DRM governance."
+OE,BH-L1062,OE4,Governance for DRM - Disaster Preparedness,ER1,YES,Improved governance for disaster risk management,High,Strong,"Under SO 1 to strengthen resilience to disaster and climate change, enhancing governance for disaster preparedness directly evidences improved DRM governance."
+OE,BH-L1062,OE5,Governance for DRM - Recovery Planning,ER1,YES,Improved governance for disaster risk management,High,Strong,"Under SO 1 to strengthen resilience to disaster and climate change, improving governance for recovery planning directly evidences improved DRM governance."
+OE,BH-L1062,OE6,Governance for DRM - Financial Protection,ER1,YES,Improved governance for disaster risk management,High,Strong,"Under SO 1 to strengthen resilience to disaster and climate change, strengthening governance for financial protection directly evidences improved DRM governance."
+OP,BH-L1062,,,,YES,Improved governance for disaster risk management,High,Strong,"Multiple specific objectives target governance improvements across DRM pillars under SO 1, jointly evidencing improved DRM governance."
+OE,BH-L1063,OE1,Climate resilience of New Providence,SO1,YES,Strengthen the country’s resilience to disaster and climate change,Low,Weak,"Under the disaster and climate change resilience objective, the words 'contribute to the climate resilience and sustainability of New Providence' show it acts on resilience, but it does not specify the governance improvements measured by the closest result on disaster risk management (ER 1.1), with division INE/TSP suggesting a transport-resilience focus."
+OP,BH-L1063,,,,YES,Strengthen the country’s resilience to disaster and climate change,Low,Weak,"The general objective cites 'contribute to the climate resilience and sustainability of New Providence', connecting at the objective level without evidencing the governance result."
+OE,BH-L1065,OE1,"Fiscal sostenibilidad via impuestos, gasto y DRM",ER1,YES,"Improved fiscal balances, and strengthen debt and state-owned enterprise management",High,Strong,"Under the public financial management objective, the words 'achieve medium and long-term fiscal sustainability' and 'strengthen the tax policy framework' and 'improve the quality of public expenditure' indicate action on fiscal balances; division IFD/FMM confirms the sector."
+OE,BH-L1065,OE1,"Fiscal sostenibilidad via impuestos, gasto y DRM",ER2,YES,Improved governance for disaster risk management,High,Strong,"Under the disaster and climate resilience objective, the words 'strengthen government capacity to effectively manage disaster risks by implementing the DRM tools' directly address governance for DRM."
+OP,BH-L1065,,,,YES,"Improved fiscal balances, and strengthen debt and state-owned enterprise management",High,Strong,"The general objective targets fiscal sustainability through tax and expenditure measures, aligning strongly with improved fiscal balances."
+OP,BH-L1065,,,,YES,Improved governance for disaster risk management,High,Strong,"The general objective explicitly seeks to strengthen DRM capacity and tools, aligning strongly with governance for disaster risk management."
+OE,BH-O0011,OE1,Productividad y sostenibilidad de la economia local (Andros y Abaco),SO1,YES,Improve the business climate,Low,Weak,"Under the business-climate objective, the words 'introducing technological solutions to local SMEs' indicate action on the productive sector, but the nearest results on financial access and female labor outcomes are not targeted, and division PTI/CTI supports this sectoral reading."
+OE,BH-O0011,OE1,Productividad y sostenibilidad de la economia local (Andros y Abaco),SO2,YES,Strengthen the country’s resilience to disaster and climate change,Low,Weak,"Under the resilience objective, the words 'enhancing monitoring and enforcement of nature sensitive areas' and 'implementing climate change solutions' indicate action on climate resilience, but the nearest result on governance for disaster risk management is not explicitly targeted, with division PTI/CTI guiding the sector."
+OP,BH-O0011,,,,YES,Improve the business climate,Low,Weak,"The operation supports SMEs through technology, connecting to the business-climate objective without evidencing finance or female labor outcomes."
+OP,BH-O0011,,,,YES,Strengthen the country’s resilience to disaster and climate change,Low,Weak,"The operation implements climate-related actions, connecting to the resilience objective without evidencing governance for disaster risk management."
+OE,BH-O0014,OE1,Water supply coverage and service quality,SO1,YES,Improve access to and quality of basic services,Low,Weak,"Under the basic services objective, the general objective cites 'water supply coverage' and 'quality of service' (division INE/WSA), but the nearest result is on PPP frameworks for resilient social infrastructure, which this objective does not evidence."
+OP,BH-O0014,,,,YES,Improve access to and quality of basic services,Low,Weak,"The general objective targets water service coverage and quality within the basic services objective, without evidencing a specific result."
+OE,BH-T1070,OE1,Operational capacity of SBDC Bahamas,ER1,YES,Expanded access to financial resources for investment and resiliency by the productive sector,,,"Under the business climate objective, strengthening SBDC's processes and information systems to better execute MSME programs supports expanded access to financial resources by the productive sector."
+OE,BH-T1070,OE1,Operational capacity of SBDC Bahamas,ER2,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the government effectiveness objective, SBDC Bahamas is a public-sector entity and improving its operational flow, processes and information systems contributes to public sector digitalization and skills."
+OP,BH-T1070,,,,YES,Expanded access to financial resources for investment and resiliency by the productive sector,,,Strengthening SBDC to execute MSME programs supports expanded access to financial resources by firms.
+OP,BH-T1070,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,Improving a public entity's processes and information systems contributes to public sector digitalization and capacity.
+OE,BH-T1083,OE1,Integracion de servicios de atencion primaria,ER1,YES,Improved access to health services with a focus on preventative care,,,"Under the basic services objective, integrating MOH and NHIA primary care services to 'facilitate access and enhance the quality of care' supports improved access to health services focused on preventative care."
+OE,BH-T1083,OE2,Diseno de clinicas adaptables y resilientes para atencion primaria,ER1,YES,Improved access to health services with a focus on preventative care,,,"Under the basic services objective, designing adaptable and climate-resilient primary care clinics that can respond to public health emergencies supports improved access to health services with a preventative focus."
+OE,BH-T1083,OE3,Transformacion digital en salud (EHR y telemedicina),ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the government effectiveness and public services objective, advancing EHR, telemedicine, and digital health architecture evidences improved public sector digitalization."
+OE,BH-T1083,OE3,Transformacion digital en salud (EHR y telemedicina),ER2,YES,Improved access to health services with a focus on preventative care,,,"Under the basic services objective, digital health tools like EHR and telemedicine facilitate access to health services with an emphasis on preventative care."
+OP,BH-T1083,,,,YES,Improved access to health services with a focus on preventative care,,,"The TC connects to improved access to health services through primary care integration, resilient clinic design, and digital health tools."
+OP,BH-T1083,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"The TC advances public sector digitalization via EHR, telemedicine, and digital health architecture."
+OE,BH-T1087,OE1,Design of NIF and SWF for capital mobilization,ER1,YES,Expanded access to financial resources for investment and resiliency by the productive sector,,,"Under the business-climate objective, designing a National Infrastructure Fund and a Sovereign Wealth Fund aims to mobilize private investment, supporting expanded access to financial resources for investment and resiliency by the productive sector."
+OP,BH-T1087,,,,YES,Expanded access to financial resources for investment and resiliency by the productive sector,,,The TC connects to this result through the design of the NIF and SWF to mobilize private capital for investment and resiliency.
+OE,BH-T1088,OE1,Avance de la igualdad de genero y empoderamiento de mujeres y ninas,SO1,YES,"Reduce violent crime, especially crime against women",,,"Under the objective to reduce violent crime, especially crime against women, the closest result is 'Violence and gender dimensions incorporated into education programs', but the OE emphasizes inter-agency coordination and access to services for GBV survivors rather than education programs."
+OP,BH-T1088,,,,YES,"Reduce violent crime, especially crime against women",,,"The TC’s objective and components act on services and coordination for women and girls experiencing GBV, connecting to this objective without evidencing a specific result."
+OE,BH-T1090,OE1,Technical capacities for Blue Economy policy and monitoring,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the objective Improve government effectiveness and responsiveness, and the quality of public services, strengthening technical capacities aligns with enhancing civil servants' skills and governance structures measured by this result."
+OE,BH-T1090,OE2,Sustainable financing strategies for the Blue Economy,ER1,YES,Expanded access to financial resources for investment and resiliency by the productive sector,,,"Under the business climate objective, developing sustainable financing strategies supports expanding access to financial resources for investment and resiliency by the productive sector."
+OP,BH-T1090,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,The TC contributes to enhanced civil service skills and governance structures under the government effectiveness objective.
+OP,BH-T1090,,,,YES,Expanded access to financial resources for investment and resiliency by the productive sector,,,The TC develops sustainable financing strategies that support expanded access to financial resources under the business climate objective.
+OE,BH-T1093,OE1,Action Plan C&D,,NO,None,,,"The general objective 'Action Plan C&D' names no sector, service or population and could fit multiple objectives, and division CCB/CBH does not disambiguate."
+OP,BH-T1093,,,,NO,None,,,Only the general objective was available and it does not identify what the operation acts upon.
+OE,BH-T1094,OE1,Integrated disaster and health risk management framework,ER1,YES,Improved governance for disaster risk management,,,"Under the objective to strengthen the country’s resilience to disaster and climate change, the OE builds a risk management framework and strengthens governance for disaster risk management."
+OE,BH-T1094,OE1,Integrated disaster and health risk management framework,SO1,YES,Improve access to and quality of basic services,,,"Under the basic services objective (health), the closest results are on access to health services and PPPs, but the OE focuses on risk management and crisis response frameworks rather than access or PPPs."
+OP,BH-T1094,,,,YES,Improved governance for disaster risk management,,,The TC connects to this result via its risk management framework and governance support under the disaster resilience objective.
+OP,BH-T1094,,,,YES,Improve access to and quality of basic services,,,The TC acts on the health services sector through risk management and crisis response frameworks without evidencing a specific result under this objective.
+OE,BH-T1096,OE1,Support DRM governance policy reforms,ER1,YES,Improved governance for disaster risk management,,,"Under the objective to strengthen the country’s resilience to disaster and climate change, the TC backs design, implementation, and evaluation of policy reforms including a DRM governance operation, which connects to improved governance for disaster risk management."
+OP,BH-T1096,,,,YES,Improved governance for disaster risk management,,,"The operation connects via its support to policy reform design, implementation, and evaluation focused on DRM governance."
+OE,BH-T1097,OE1,Talent pipeline and orientation of training and intermediation,SO1,YES,Improve the business climate,,,"The OE acts upon labor market functioning under the 'Improve the business climate' objective through skills needs identification and aligning training and intermediation, but it falls short of RE 'Improved labor market outcomes for females' because it does not target females."
+OP,BH-T1097,,,,YES,Improve the business climate,,,"The operation connects at the objective level to 'Improve the business climate' via its focus on skills, training, and labor intermediation without evidencing a female-specific labor market result."
+OE,BH-T1100,OE1,Climate risk management capacity for infrastructure,ER1,YES,Improved governance for disaster risk management,,,"Under the disaster and climate resilience objective, the OE and its indicator target policies and planning for climate risk management of transport infrastructure, evidencing improved governance for disaster risk management."
+OP,BH-T1100,,,,YES,Improved governance for disaster risk management,,,The TC connects to this result through climate risk mapping and policy adoption to strengthen disaster and climate risk governance.
+OE,BH-T1102,OE1,Action Plan C&D,,NO,None,,,The general objective is too unspecific to identify a sector or any expected result among the listed strategic objectives.
+OP,BH-T1102,,,,NO,None,,,No specific objective aligns with any result or strategic objective based on the available general objective.
+OE,BH-T1103,OE1,Advance clean energy development,ER1,YES,Reduced reliance on fossil fuels,,,"Under the objective to promote investments in sustainable infrastructure, the OE to 'advance clean energy development' contributes directly to reducing reliance on fossil fuels."
+OP,BH-T1103,,,,YES,Reduced reliance on fossil fuels,,,"The TC supports clean energy development, which connects to reducing reliance on fossil fuels under the sustainable infrastructure objective."
+OE,BH-T1104,OE1,Apoyo a implementacion de conservacion para PBG,SO1,YES,Strengthen the country’s resilience to disaster and climate change,,,"Acts upon climate resilience through marine spatial planning and conservation governance, but the nearest result under this objective is improved governance for disaster risk management, which is more specific than conservation governance."
+OP,BH-T1104,,,,YES,Strengthen the country’s resilience to disaster and climate change,,,The TC advances climate resilience via marine spatial planning and conservation governance but does not evidence the specific DRM governance result under this objective.
+OE,BH-T1105,OE1,Government frameworks for identification and data policies,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the objective to improve government effectiveness and responsiveness and the quality of public services (SO 3), strengthening frameworks for identification systems and data policies directly supports public sector digitalization and governance structures."
+OP,BH-T1105,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,The operation advances SO 3 via work on identification systems and data policy frameworks that support public sector digitalization and governance.
+OE,BH-T1107,OE1,Awareness for coordinated climate action,SO1,YES,Strengthen the country’s resilience to disaster and climate change,,,"This OE acts upon climate resilience under the disaster and climate objective; the nearest result is improved governance for disaster risk management, which awareness and coordination alone do not evidence."
+OP,BH-T1107,,,,YES,Strengthen the country’s resilience to disaster and climate change,,,"The operation supports awareness and coordination on climate action, connecting at the objective level to climate resilience without evidencing a specific result."
+OE,BH-T1108,OE1,Strengthening of the Procurement Department,SO1,YES,Improve the central government’s public financial management,,,"Strengthening the Procurement Department, a public entity that serves the whole of government, acts upon public financial management under this objective, but it does not by itself evidence the nearest result on improved fiscal balances, debt or state-owned enterprise management."
+OP,BH-T1108,,,,YES,Improve the central government’s public financial management,,,"The operation strengthens the Procurement Department, connecting at the objective level to public financial management without evidencing a specific result."
+OE,BH-T1109,OE1,Inicio de implementacion de NRW en Islas Familiares,SO1,YES,Improve access to and quality of basic services,,,"Under the basic services objective (SO 6), the OE acts on water service quality via NRW reduction at the public utility WSC, but it does not evidence ER 6.2 on PPP frameworks (closest) so only the objective-level alignment applies."
+OP,BH-T1109,,,,YES,Improve access to and quality of basic services,,,The TC connects to the basic services objective through NRW reduction in water services without evidencing a specific result under that objective.
+OE,BH-T1111,OE1,Action Plan C&D,,NO,None,,,"The general objective 'Action Plan C&D' names no sector, service or population and could fit several objectives, and division CCB/CBH does not disambiguate the sector."
+OP,BH-T1111,,,,NO,None,,,Only the general objective was available and it does not identify what the operation acts upon.
+OE,BH-T1113,OE1,Resilient transport projects strengthened,SO1,YES,Strengthen the country’s resilience to disaster and climate change,,,"Acts upon climate-resilient transport projects, so the nearest objective is disaster and climate resilience; the closest result is Improved governance for disaster risk management, but the OE focuses on project preparation and sectoral capacity rather than DRM governance itself."
+OP,BH-T1113,,,,YES,Strengthen the country’s resilience to disaster and climate change,,,"The TC supports preparation and capacity for climate-resilient transport, connecting to the resilience objective at a general level."
+OE,BH-T1115,OE1,Modernized water and sanitation legal and regulatory framework,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the objective to improve government effectiveness and public service quality (SO 3), modernizing the water and sanitation legal and regulatory framework strengthens governance structures measured by this result."
+OP,BH-T1115,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,The operation advances strengthened governance structures by modernizing the legal and regulatory framework in the water and sanitation sector.
+OE,BH-T1118,OE1,Follow-up estimates for MPA-related outcomes,SO1,YES,"Improve government effectiveness and responsiveness, and the quality of public services",,,"Under the government effectiveness objective; the nearest result is on public sector digitalization, enhanced civil servant skills and governance structure, but this OE only produces follow-up estimates and does not itself build skills, digital infrastructure or governance."
+OE,BH-T1118,OE2,Capacity building to run the InVEST model,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the government effectiveness objective; it builds and transfers capacities in national agencies to operate the InVEST model, which fits the enhanced skills of civil servants measured by this result."
+OE,BH-T1118,OE3,Nightlight indicators estimated for tourism areas,SO1,YES,"Improve government effectiveness and responsiveness, and the quality of public services",,,"Under the government effectiveness objective; the nearest result is on public sector digitalization, enhanced civil servant skills and governance structure, but this OE only estimates nightlight indicators and does not itself build skills, digital infrastructure or governance."
+OP,BH-T1118,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"One specific objective evidences this result through capacity building in national agencies, while the others connect only at the objective level."
+OE,BH-T1119,OE1,Teacher digital literacy training,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the government effectiveness objective (SO 3), training educators in digital literacy and supporting digital transformation in education aligns with enhancing skills of civil servants as part of public sector digitalization."
+OP,BH-T1119,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,The operation advances public sector digitalization by enhancing educators' digital skills aligned with SO 3.
+OE,BH-T1120,OE1,Action Plan C&D,,NO,None,,,The objective text is too generic and does not evidence any specific result or strategic objective from the strategy.
+OP,BH-T1120,,,,NO,None,,,No specific objective aligns with any strategy result or objective based on the available content.
+OE,BH-T1122,OE1,Institutional capacity for NDP planning,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the objective Improve government effectiveness and responsiveness, and the quality of public services, this OE strengthens governance and institutional capacity for strategic planning, fitting ER 3.1 on strengthened governance structures and skills."
+OE,BH-T1122,OE2,Capacity for evidence-based social investment strategies,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the objective Improve government effectiveness and responsiveness, and the quality of public services, building capacity to design evidence-based social investment strategies aligns with ER 3.1 on enhanced civil service skills and governance structures."
+OP,BH-T1122,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,Both specific objectives connect to ER 3.1 under the government effectiveness objective through strengthened governance structures and capacity building.
+OE,BH-T1123,OE1,Governance and coordination of the NSS,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the objective to Improve government effectiveness and responsiveness, and the quality of public services, strengthening NSS governance and coordination directly supports the strengthened governance structure captured by this result."
+OE,BH-T1123,OE2,Institutional and HR capacity of BNSI,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the objective to Improve government effectiveness and responsiveness, and the quality of public services, building institutional capacity and civil-service skills at BNSI (a public-sector statistics office) matches the enhanced skills and governance structure measured by this result."
+OE,BH-T1123,OE3,Coordination and interoperability of NSS data systems,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the objective to Improve government effectiveness and responsiveness, and the quality of public services, improving interoperability of data systems advances public sector digitalization and digital infrastructure as measured by this result."
+OP,BH-T1123,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"The operation’s objectives jointly advance digitalization, civil-service skills, and governance structures under the government effectiveness objective."
+OE,BH-T1124,OE1,Business advisory services for MSMEs,ER1,YES,Expanded access to financial resources for investment and resiliency by the productive sector,,,"Under the business climate objective, advisory support for MSMEs contributes to the operation’s aim to help them 'access financing', aligning with expanded access to financial resources."
+OE,BH-T1124,OE2,Research and publication for MSMEs,ER1,YES,Expanded access to financial resources for investment and resiliency by the productive sector,,,"Under the business climate objective, research and publication supporting MSMEs complement the operation’s aim to help them 'access financing', aligning with expanded access to financial resources."
+OE,BH-T1124,OE3,Fintech and e-commerce innovation for MSMEs,ER1,YES,Expanded access to financial resources for investment and resiliency by the productive sector,,,"Under the business climate objective, innovation in fintech and e-commerce directly facilitates MSMEs' ability to 'access financing', supporting expanded access to financial resources."
+OE,BH-T1124,OE4,Public awareness for MSMEs,ER1,YES,Expanded access to financial resources for investment and resiliency by the productive sector,,,"Under the business climate objective, public awareness initiatives for MSMEs back the effort to help them 'access financing', aligning with expanded access to financial resources."
+OP,BH-T1124,,,,YES,Expanded access to financial resources for investment and resiliency by the productive sector,,,Multiple specific objectives contribute to expanding MSMEs' access to financing under the business climate objective.
+OE,BH-T1126,OE1,Integration of primary care services,ER1,YES,Improved access to health services with a focus on preventative care,,,"Under the objective Improve access to and quality of basic services, integrating primary care and designing a person- and community-centered model directly targets improved access to health services with preventive focus."
+OE,BH-T1126,OE1,Integration of primary care services,ER2,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the objective Improve government effectiveness and responsiveness, and the quality of public services, advancing digital health, EHR implementation, and a digital health architecture evidences public sector digitalization."
+OP,BH-T1126,,,,YES,Improved access to health services with a focus on preventative care,,,The TC connects via integrating primary care and a person- and community-centered model to improved access to health services.
+OP,BH-T1126,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"The TC connects via digital health transformation, EHR implementation, and digital architecture to public sector digitalization."
+OE,BH-T1130,OE1,Sustainable aviation strategy and resilient aerodromes,ER1,YES,Reduced reliance on fossil fuels,,,"Under the sustainable infrastructure objective, the OE includes studies to adopt sustainable aviation fuels and energy-efficient aerodromes, which contribute to reducing reliance on fossil fuels."
+OP,BH-T1130,,,,YES,Reduced reliance on fossil fuels,,,The TC connects to this result through work on sustainable aviation fuels and energy-efficient aerodrome design.
+OE,BH-T1131,OE1,Strategic planning for sustainable and resilient tourism,ER1,YES,Improved governance for disaster risk management,,,"Under the objective to strengthen the country’s resilience to disaster and climate change, the OE’s diagnostics and framework integrate climate resilience and adaptation into tourism planning, supporting governance for disaster risk management."
+OP,BH-T1131,,,,YES,Improved governance for disaster risk management,,,The TC connects to the disaster and climate resilience objective by developing a framework that supports governance for disaster risk management.
+OE,BH-T1132,OE1,Entendimiento de drivers de desempeño de ejecución,SO1,YES,"Improve government effectiveness and responsiveness, and the quality of public services",,,"Under this objective, the nearest result is on public sector digitalization, civil servant skills, and governance, but this OE focuses on analyzing and validating drivers of execution performance rather than directly advancing those areas."
+OE,BH-T1132,OE2,Uso de hallazgos para pilotear intervenciones,SO1,YES,"Improve government effectiveness and responsiveness, and the quality of public services",,,"Under this objective, the nearest result is on public sector digitalization, civil servant skills, and governance, but this OE pilots targeted interventions to improve execution without explicitly addressing those dimensions."
+OP,BH-T1132,,,,YES,"Improve government effectiveness and responsiveness, and the quality of public services",,,"Both specific objectives connect at the objective level to government effectiveness, without evidencing a specific result under it."
+OE,BH-T1133,OE1,CSA institutional and policy systems in agriculture,ER1,YES,Improved governance for disaster risk management,,,"Under the objective to strengthen resilience to disaster and climate change, the OE sets policy and coordination frameworks for climate-smart agriculture that support governance for disaster risk management."
+OP,BH-T1133,,,,YES,Improved governance for disaster risk management,,,The operation strengthens CSA policy and coordination supporting governance for disaster risk management under the resilience objective.
+OE,BH-T1134,OE1,Capacity for climate-resilient transport project execution,ER1,YES,Improved governance for disaster risk management,,,"Under the disaster and climate resilience objective, strengthening technical and operational capacity for climate-resilient transport execution and flood hazard analysis supports governance for disaster risk management."
+OP,BH-T1134,,,,YES,Improved governance for disaster risk management,,,The TC connects to the disaster and climate resilience objective through capacity building for climate-resilient transport execution and hazard analysis.
+OE,BH-T1136,OE1,Digital transformation and EMIS in education,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the objective to improve government effectiveness and responsiveness, and the quality of public services, the OE strengthens EMIS and digital skills within the education sector, which is captured by improved public sector digitalization."
+OP,BH-T1136,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,The TC contributes to the objective on government effectiveness via EMIS development and digital capacity building that align with improved public sector digitalization.
+OE,BH-T1137,OE1,Action Plan C&D,,NO,None,,,"The general objective 'Action Plan C&D' identifies no sector or service and could fit multiple unrelated objectives, and division CCB/CBH does not disambiguate the sector."
+OP,BH-T1137,,,,NO,None,,,Only the general objective was available and it does not identify what the operation acts upon.
+OE,BH-T1138,OE1,Institutional capacity to implement NES,SO1,YES,Improve the business climate,,,"Under the business climate objective, this OE builds capacity to implement the National Export Strategy but does not evidence ER 4.1 on access to finance or ER 4.2 on female labor outcomes, so only the objective-level alignment applies."
+OP,BH-T1138,,,,YES,Improve the business climate,,,The operation acts on the business climate via National Export Strategy implementation capacity without evidencing any specific result under that objective.
+OE,BH-T1141,OE1,Capacidad del Ministerio de Finanzas para gestionar reformas PFM,ER1,YES,"Improved fiscal balances, and strengthen debt and state-owned enterprise management",,,"Under the objective to improve the central government’s public financial management, the OE builds the Ministry of Finance’s capacity to plan, manage and oversee PFM and asset management reforms via a coordinated framework, which relates to fiscal balances and management of debt and SOEs."
+OE,BH-T1141,OE1,Capacidad del Ministerio de Finanzas para gestionar reformas PFM,ER2,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the objective to improve government effectiveness and public services, the operation supports digital transformation, interoperability and data-driven decision making in the public sector, aligning with public sector digitalization."
+OP,BH-T1141,,,,YES,"Improved fiscal balances, and strengthen debt and state-owned enterprise management",,,"The operation connects via strengthened MoF capacity to plan and oversee PFM reforms, which relates to fiscal balances and management of debt and SOEs."
+OP,BH-T1141,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"The operation supports digital transformation and interoperability for data-driven public management, aligning with public sector digitalization."
+OE,BH-T1143,OE1,Adoption of wastewater and solid waste master plan,SO1,YES,Improve access to and quality of basic services,,,"Under the basic services objective; the closest result is on strengthened PPP frameworks for resilient social infrastructure, but the OE delivers sector master plans rather than changes to PPP frameworks."
+OP,BH-T1143,,,,YES,Improve access to and quality of basic services,,,"The operation acts on basic services via sector master plans, without evidencing a specific result under this objective."
+OE,BH-T1144,OE1,Fortalecimiento capacidad GOBH para ejecutar BE,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the objective to improve government effectiveness and responsiveness, the OE builds governance and civil service capabilities via M&E systems, audit models, and coordination to execute blue economy activities, which fits this result."
+OP,BH-T1144,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,The TC supports government capabilities and governance systems consistent with this public sector effectiveness result.
+OE,BH-T1149,OE1,Geospatial info capacity at BAMSI,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the objective 'Improve government effectiveness and responsiveness, and the quality of public services', the words 'institutional and technical capacity' to 'generate, manage, analyze, and use timely geospatial information' in a public institute indicate digitalization and skills, and division PTI/ARD confirms the sector."
+OE,BH-T1149,OE1,Geospatial info capacity at BAMSI,SO1,YES,Strengthen the country’s resilience to disaster and climate change,,,"The nearest result under this objective is 'Improved governance for disaster risk management' but the OE emphasizes 'climate-resilient natural resource management' rather than DRM governance, with division PTI/ARD guiding the sector reading."
+OP,BH-T1149,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"The general objective names geospatial information capacity in a public institute, which fits public-sector digitalization and skills."
+OP,BH-T1149,,,,YES,Strengthen the country’s resilience to disaster and climate change,,,"The general objective addresses climate-resilient natural resource management, connecting generally to climate resilience but not to DRM governance."
+OE,BH-T1150,OE1,Strengthening national planning and development framework,ER1,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"Under the objective to improve government effectiveness and the quality of public services, the general objective cites 'institutional strengthening of the national planning and development framework' and exposure to 'governance structures', which relate to enhanced skills and governance structure measured by this result."
+OP,BH-T1150,,,,YES,"Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure",,,"The general objective references 'institutional strengthening of the national planning and development framework' and 'governance structures', which connect to this result under government effectiveness and public service quality."
+</script>
+<script type="text/plain" id="resumen-src">
+EXECUTIVE SUMMARY
+Bahamas · Country Strategy 2024-2028
+
+
+ALIGNMENT WITH THE STRATEGY
+
+The 7 Strategic Objectives of the country strategy:
+- All of them have aligned operations.
+- 6 have at least one operation with strong alignment.
+- The objective “Reduce violent crime, especially crime against women” is supported solely by technical cooperations, which have no alignment grade.
+
+The 9 Expected Results of the country strategy:
+- 7 of 9 have aligned operations.
+- 6 have at least one operation with strong alignment.
+- The expected result “Improved labor market outcomes for females” only has operations with weak alignment.
+- 2 have no aligned operations: “Strengthened framework for public-private partnerships for resilient social infrastructure” and “Violence and gender dimensions incorporated into education programs”.
+
+
+THE PORTFOLIO
+
+Out of a total of 54 operations active since the approval of the current country strategy (loans, guarantees, investment grants and technical cooperations), 16 are loans and guarantees and 38 are technical cooperations.
+
+Loans and guarantees: of the 16 in scope, 16 (100%) show at least one alignment with the country strategy. 26 alignments were identified, 12 strong and 14 weak. Of these, 35 link to an Expected Result of the strategy and 9 to a Strategic Objective.
+
+Technical cooperations: of the 38 in scope, 33 (87%) show at least one alignment with the country strategy. 41 alignments were identified, which have no alignment grade. Of these, 37 link to an Expected Result of the strategy and 13 to a Strategic Objective.
+
+Five operations were analysed with no relation found to the strategy: BH-T1093, BH-T1102, BH-T1111, BH-T1120, BH-T1137.
+
+
+CONCENTRATION
+
+Half of the aligned operations concentrate in two of the 7 Expected Results of the strategy with coverage. The five with the most operations are: “Improved public sector digitalization including digital infrastructure, enhanced skills of civil servants, and strengthened governance structure” (20 operations), “Improved governance for disaster risk management” (10), “Expanded access to financial resources for investment and resiliency by the productive sector” (5), “Improved access to health services with a focus on preventative care” (5), “Improved fiscal balances, and strengthen debt and state-owned enterprise management” (4).
+</script>
+<script type="text/plain" id="colores-src">@@COLORES@@</script>
+<script type="text/plain" id="lang-src">Inglés</script>
+
+<div class="tab-content" id="tab-resumenejec">
+  <div class="tab-intro" data-i18n="intro_resumenejec">Resumen ejecutivo de la alineación cartera–estrategia (generado en el flujo).</div>
+  <div id="resumen-ejec-cont" style="margin:8px 36px 24px;max-width:var(--viz-max);white-space:pre-wrap;line-height:1.6;font-size:13.5px;color:var(--ink);"></div>
+</div>
+
+<script>
+/* ============================================================
+   PARTE 1 — ESTRUCTURA DE LA ESTRATEGIA (fija para DR).
+   Jerarquía: Pilar (área estratégica) › Objetivo Estratégico › ER.
+   Si algún día cambia la estrategia del país, se edita acá.
+   ============================================================ */
+/* ============================================================
+   PARTE 1 — ESTRUCTURA DE LA ESTRATEGIA DEL PAÍS
+   Jerarquía: Pilar (área estratégica) › Objetivo Estratégico › ER.
+
+   ⚠️ AL CAMBIAR DE PAÍS, LEER ESTO:
+   1. Copiá el texto de cada ER EXACTAMENTE como se le pasa al agente
+      de clasificación: mismo IDIOMA y misma REDACCIÓN que ve el agente.
+      NO transcribas desde una matriz traducida (p. ej. una imagen en
+      inglés) si el agente trabaja en español: ese fue el origen de que
+      cambiaran nombres y no coincidieran los resultados.
+   2. El texto de cada ER debe coincidir con la columna related_er del
+      output del agente. La normalización de más abajo ya tolera las
+      diferencias de FORMATO (punto final, espacios, mayúsculas, acentos),
+      así que no hace falta que sea idéntico carácter a carácter.
+   3. Si el agente además REFORMULA un ER (redacción distinta, no solo
+      formato), agregá esa variante en ER_ALIASES. El panel de
+      diagnóstico (arriba de las pestañas) te dice cuáles hace falta.
+   ============================================================ */
+let STRATEGY = [
+  { pilar:"NOMBRE DEL ÁREA / PILAR 1", objetivos:[
+    { obj:"Nombre del objetivo estratégico", ers:[
+      "Texto exacto del Resultado Esperado (ER), tal como lo ve el agente",
+      "Texto exacto de otro ER",
+    ]},
+    { obj:"Otro objetivo estratégico", ers:[
+      "Texto exacto del ER",
+    ]},
+  ]},
+  { pilar:"NOMBRE DEL ÁREA / PILAR 2", objetivos:[
+    { obj:"Nombre del objetivo estratégico", ers:[
+      "Texto exacto del ER",
+    ]},
+  ]},
+  // ... un bloque { pilar... } por cada área estratégica ...
+];
+
+/* ============================================================
+   NORMALIZACIÓN DE ER — capa fija, agnóstica de país e idioma.
+   Hace robusta la vinculación entre el related_er del agente y el ER
+   canónico de la estrategia: ignora punto final, espacios, mayúsculas
+   y acentos. NO tocar al cambiar de país.
+   ============================================================ */
+/* Parte un texto en hasta maxLines líneas de ~maxChars caracteres, cortando por palabra.
+   Si aún excede, trunca la última línea con "…". Devuelve array de líneas. */
+function wrapLabel(text, maxChars, maxLines){
+  maxChars=maxChars||46; maxLines=maxLines||2;
+  const words=String(text||"").replace(/\s+/g," ").trim().split(" ");
+  const out=[]; let line="";
+  for(let i=0;i<words.length;i++){
+    const w=words[i];
+    const t=line?line+" "+w:w;
+    if(t.length<=maxChars){ line=t; }
+    else if(out.length<maxLines-1){ if(line)out.push(line); line=w; }
+    else { line=t; }   // en la última línea permitida: seguir para truncar después
+  }
+  if(line) out.push(line);
+  if(out.length>maxLines) out.length=maxLines;
+  // ¿quedó texto sin mostrar? truncar la última línea
+  const lastIdx=out.length-1;
+  if(out[lastIdx] && out[lastIdx].length>maxChars){
+    let s=out[lastIdx].slice(0,maxChars-1);
+    s=s.replace(/\s+\S*$/,"");           // no cortar palabra a la mitad
+    out[lastIdx]=(s||out[lastIdx].slice(0,maxChars-1))+"…";
+  }
+  return out;
+}
+function _normKey(s){
+  return String(s||"")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")   // sin acentos
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g," ")                          // solo alfanumérico
+    .trim();
+}
+/* ER_ALIASES — ESPECÍFICO DE CADA PAÍS. Dejar VACÍO por defecto.
+   Solo se llena cuando el agente REFORMULA un ER (no por diferencias de
+   formato, que ya resuelve _normKey). Formato:
+     "texto de la variante que devuelve el agente": "ER canónico de STRATEGY",
+   El panel de diagnóstico indica qué cadenas agregar acá. */
+const ER_ALIASES = {
+};
+/* SHOW_OBJ_LINKS: true dibuja líneas directas Operación→Objetivo para las filas cuyo
+   related_er es el nombre de un Objetivo (no un RE). false las ignora (versión "solo RE"). */
+let SHOW_OBJ_LINKS = true;
+const OBJ_PREFIX="##OBJ##";   // marca un related_er que en realidad apunta a un Objetivo Estratégico
+let _erCanonIndex=null, _objCanonIndex=null;
+function _buildErCanonIndex(){
+  _erCanonIndex={}; _objCanonIndex={};
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>{
+    _objCanonIndex[_normKey(o.obj)]=o.obj;
+    o.ers.forEach(er=>{ _erCanonIndex[_normKey(er)]=er; });
+  }));
+  Object.keys(ER_ALIASES).forEach(k=>{ _erCanonIndex[_normKey(k)]=ER_ALIASES[k]; });
+}
+function canonicalER(text){
+  const s=String(text==null?"":text).trim();
+  if(s===""||s.toLowerCase()==="none") return "None";
+  if(!_erCanonIndex) _buildErCanonIndex();
+  const k=_normKey(s);
+  if(_erCanonIndex[k]) return _erCanonIndex[k];        // matchea un RE
+  if(_objCanonIndex[k]) return OBJ_PREFIX+_objCanonIndex[k];  // matchea un Objetivo -> línea op→objetivo
+  return s;                                            // sin match -> se mantiene (no coincidente)
+}
+function isObjRef(er){ return typeof er==="string" && er.indexOf(OBJ_PREFIX)===0; }
+function objOf(er){ return isObjRef(er) ? er.slice(OBJ_PREFIX.length) : null; }
+
+/* ============================================================
+   PARTE 2 — DATOS DEL OUTPUT DEL AGENTE (una fila por alineación OE→ER).
+   Reemplazar el contenido de ROWS con el output real.
+     op, op_type("A"/"B"), oe_id, oe(texto), er(related_er / "None"),
+     conn("YES"/"NO"), feas, align("Strong"/"Weak"/"None"), reasoning
+   El texto de "er" debe coincidir con un ER de STRATEGY para conectar.
+   ============================================================ */
+let ROWS = [
+  {op:"XX-L0001", op_type:"A", oe_id:"OE1", oe:"RE de operación de ejemplo (alineación fuerte)", er:"Texto exacto del Resultado Esperado (ER), tal como lo ve el agente", conn:"YES", feas:"High", align:"Strong", reasoning:"Fila de ejemplo — se reemplaza al cargar el CSV real del agente."},
+  {op:"XX-L0001", op_type:"A", oe_id:"OE2", oe:"RE de operación de ejemplo (alineación débil)", er:"Texto exacto de otro ER", conn:"YES", feas:"Low", align:"Weak", reasoning:"Fila de ejemplo."},
+  {op:"XX-T0001", op_type:"B", oe_id:"OE1", oe:"Cooperación técnica de ejemplo", er:"Texto exacto del ER", conn:"YES", feas:"", align:"Weak", reasoning:"Fila de ejemplo."},
+  {op:"XX-L0002", op_type:"A", oe_id:"OE1", oe:"Operación de ejemplo sin alineación", er:"None", conn:"NO", feas:"", align:"None", reasoning:"Fila de ejemplo sin conexión con la estrategia."},
+];
+
+/* Normaliza el ER de cada fila embebida con el mismo criterio que usaba la carga por CSV.
+   Permite pegar el output del agente TAL CUAL en ROWS (sin limpiar punto final, acentos,
+   etc.): la canonicalización y el panel de diagnóstico se resuelven automáticamente. */
+ROWS = ROWS.map(r => Object.assign({}, r, { er: canonicalER(r.er) }));
+
+/* ==== Inyección desde el flujo: si los placeholders fueron reemplazados, usarlos ==== */
+(function(){
+  try{ var se=document.getElementById('estrategia-src'); if(se){ var t=se.textContent.trim();
+    if(t && !(t.charAt(0)==='@'&&t.charAt(1)==='@')){ var st=buildStrategyFromFlat(t); if(st && st.length) STRATEGY=st; } } }catch(e){ console.log('estrategia-src',e); }
+  // La STRATEGY real ya está cargada: invalidar el índice canónico para que se reconstruya con ella
+  // (si no, parseAgentCSV canonizaría contra la estrategia de ejemplo y no detectaría los objetivos).
+  _erCanonIndex=null; _objCanonIndex=null;
+  try{ var de=document.getElementById('datos-src'); if(de){ var t=de.textContent.trim();
+    if(t && !(t.charAt(0)==='@'&&t.charAt(1)==='@')){ var rw=parseAgentCSV(t); if(rw && rw.length) ROWS=rw; } } }catch(e){ console.log('datos-src',e); }
+  // Re-canonizar cualquier ROWS embebido con el índice correcto (por si no vino datos-src)
+  ROWS = ROWS.map(function(r){ return Object.assign({}, r, { er: canonicalER(r.er) }); });
+})();
+
+/* ====== Lógica de render ====== */
+const tip = d3.select("#tip");
+let PIN=false, HOVERON=false;   // clic para fijar lo resaltado
+function _clearAllHighlight(){
+  d3.selectAll("path.link").classed("dim",false).classed("show",false);
+  d3.selectAll(".node-dim").classed("node-dim",false);
+  d3.selectAll("path.shortlink").classed("dim",false);
+}
+function _unpin(){ PIN=false; HOVERON=false; _clearAllHighlight(); tip.style("opacity",0); }
+function _chartClick(){ if(PIN){ _unpin(); } else if(HOVERON){ PIN=true; } }
+function showTip(html,ev){ if(PIN) return; HOVERON=true; tip.html(html).style("opacity",1).style("left",(ev.clientX+14)+"px").style("top",(ev.clientY+14)+"px");}
+function hideTip(){ if(PIN) return; HOVERON=false; tip.style("opacity",0);}
+function curve(x1,y1,x2,y2){const mx=(x1+x2)/2;return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;}
+
+// Índice ER -> {pilar, obj}
+const erIndex = {};
+STRATEGY.forEach(p => p.objetivos.forEach(o => o.ers.forEach(er => { erIndex[er] = {pilar:p.pilar, obj:o.obj}; })));
+
+// Stats
+function computeStats(){
+  const allOps=[...new Set(ROWS.map(r=>r.op))];
+  const opType={}; ROWS.forEach(r=>{ opType[r.op]=r.op_type; });
+  const prestamos = allOps.filter(op=>opType[op]!=="B").length;   // operaciones tipo A (INV + INV GR)
+  const nObjetivos = STRATEGY.reduce((a,p)=>a+p.objetivos.length,0);
+  // ER cubiertos por operación tipo A (cartera activa)
+  const erCubA = new Set(ROWS.filter(r=>r.conn==="YES"&&r.op_type!=="B"&&r.er&&r.er!=="None").map(r=>r.er));
+  // Total de RE de la EBP = pares (objetivo, ER); cubiertos = pares cuyo ER tiene op A alineada
+  let paresEBP=0, paresCub=0;
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>{ paresEBP++; if(erCubA.has(er)) paresCub++; })));
+  document.getElementById("stats").innerHTML=`
+    <div class="stat"><div class="n">${prestamos}</div><div class="l">Préstamos (INV + INV GR)<sup class="ast">*</sup></div></div>
+    <div class="stat"><div class="n">${STRATEGY.length}</div><div class="l">Pilares en EBP</div></div>
+    <div class="stat"><div class="n">${nObjetivos}</div><div class="l">Objetivos estratégicos en EBP</div></div>
+    <div class="stat"><div class="n">${paresEBP}</div><div class="l">Resultados esperados en EBP</div></div>
+    <div class="stat"><div class="n">${paresCub}</div><div class="l">Resultados esperados en EBP cubiertos</div></div>`;
+}
+computeStats();
+
+/* ========================================================================
+   COLORES — Probabilidad de logro (SOLO operaciones tipo A).
+   - OE (RE de operación): color propio (Verde/Amarillo/Rojo) o gris si no hay dato.
+   - Operación (cuadrado): color agregado según reglas sobre sus OE.
+   - RE de estrategia y Objetivo: color CONTINUO = promedio 0–1 de las operaciones
+     tipo A alineadas con probabilidad revisada.
+   - Cooperaciones Técnicas (tipo B): siempre celeste.
+   ======================================================================== */
+let COLOR_OE = {
+  // Vacío = viz SIN colores de probabilidad (se ve como el caso simple).
+  // Para colorear: pegá acá "PROJECT|OEID":"Verde"/"Amarillo"/"Rojo" desde colores_por_oeid.csv
+  // Ej:  "DR-L1150|OE1":"Verde",
+};
+const PROB_HEX={"Verde":"#3fb96b","Amarillo":"#f2c14e","Rojo":"#e0524d","Gris":"#c2cad6"};
+const PROB_VAL={"Verde":1,"Amarillo":0.5,"Rojo":0};   // escala 0–1
+const TC_HEX="#6cb2e4";                                // celeste para CT
+// Operaciones en pipeline: se muestran con borde azul y fondo blanco (no llevan color de probabilidad)
+const PIPELINE_OPS = new Set([  /* agregar aquí los códigos de operaciones en pipeline, ej: "ME-L1350","ME-L1352" */  ]);
+function isPipeline(op){ return PIPELINE_OPS.has(op); }
+let HAS_COLORS=false; let COLOR_OE_BY_OP={};
+function rebuildColors(){
+  COLOR_OE_BY_OP={};
+  Object.keys(COLOR_OE).forEach(k=>{const i=k.indexOf("|");const op=k.slice(0,i),oe=k.slice(i+1);(COLOR_OE_BY_OP[op]=COLOR_OE_BY_OP[op]||{})[oe]=COLOR_OE[k];});
+  HAS_COLORS=Object.keys(COLOR_OE).length>0;
+}
+rebuildColors();
+/* Parser del CSV de colores (project, oe_id, color) -> mapa "project|oe_id":"Color" */
+function csvToColors(text){
+  const parsed=parseCSV(text); if(parsed.length<2) return {};
+  const h=parsed[0].map(x=>x.trim().toLowerCase());
+  const iP=h.indexOf("project"), iO=h.indexOf("oe_id"), iC=h.indexOf("color");
+  const map={}; if(iP<0||iO<0||iC<0) return map;
+  const cap=x=>x?x.charAt(0).toUpperCase()+x.slice(1).toLowerCase():"";
+  for(let k=1;k<parsed.length;k++){ const r=parsed[k];
+    const p=(r[iP]||"").trim(), o=(r[iO]||"").trim(), c=cap((r[iC]||"").trim());
+    if(p&&o&&(c==="Verde"||c==="Amarillo"||c==="Rojo")) map[p+"|"+o]=c;
+  }
+  return map;
+}
+/* Inyección de colores desde el flujo (placeholder @@COLORES@@ reemplazado por Power Automate).
+   Se ejecuta aquí, después de declarar COLOR_OE, csvToColors y rebuildColors,
+   para evitar el error "Cannot access 'COLOR_OE' before initialization". */
+(function(){
+  try{ var ce=document.getElementById('colores-src'); if(ce){ var t=ce.textContent.trim();
+    if(t && !(t.charAt(0)==='@'&&t.charAt(1)==='@')){ var cmap=csvToColors(t); if(cmap && Object.keys(cmap).length){ COLOR_OE=cmap; rebuildColors(); } } } }catch(e){ console.log('colores-src',e); }
+})();
+/* Muestra/oculta la leyenda de probabilidad según HAS_COLORS y la pestaña activa. */
+function applyLegend(){
+  var lg=document.getElementById("legend"), ln=document.getElementById("legend-note");
+  var at=document.querySelector(".tab.active"); var name=at?at.dataset.tab:"A";
+  var show = HAS_COLORS && !(name==="tabla"||name==="resumen"||name==="agregada"||name==="resumenejec");
+  if(lg) lg.style.display=show?"flex":"none";
+  if(ln) ln.style.display=HAS_COLORS?"":"none";
+}
+function oeColorName(op,oe){const c=COLOR_OE[op+"|"+oe];return (c==="Verde"||c==="Amarillo"||c==="Rojo")?c:"Gris";}
+function oeHex(op,oe){return PROB_HEX[oeColorName(op,oe)];}
+function opColorName(op){
+  const m=COLOR_OE_BY_OP[op]||{};
+  const cols=Object.values(m).filter(c=>c==="Verde"||c==="Amarillo"||c==="Rojo");
+  const n=cols.length; if(n===0) return "Gris";
+  const g=cols.filter(c=>c==="Verde").length, y=cols.filter(c=>c==="Amarillo").length, r=cols.filter(c=>c==="Rojo").length;
+  if(r>g && r>y) return "Rojo";              // mayoría roja -> rojo
+  if(g>=y && g>=r && g!==r) return "Verde";  // verde domina (le gana al amarillo en empate); empate verde-rojo NO
+  return "Amarillo";                         // empate verde-rojo, mayoría amarilla, o mezcla -> amarillo
+}
+function opMeanValue(op){
+  const m=COLOR_OE_BY_OP[op]; if(!m) return null;
+  const vals=Object.values(m).map(c=>PROB_VAL[c]).filter(v=>v!=null);
+  return vals.length? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+// Valor de un RE de operación específico (op + oe_id), según su color asignado.
+function oeValue(op,oe){
+  const m=COLOR_OE_BY_OP[op]; if(!m||!oe) return null;
+  const v=PROB_VAL[m[oe]]; return (v==null)?null:v;
+}
+function contHex(v){
+  if(v==null) return "#c2cad6";
+  const st=[[0,[224,82,77]],[0.25,[239,138,77]],[0.5,[242,193,78]],[0.75,[182,200,74]],[1,[63,185,107]]];
+  v=Math.max(0,Math.min(1,v));
+  for(let i=1;i<st.length;i++){ if(v<=st[i][0]){ const a=st[i-1][0],b=st[i][0],ca=st[i-1][1],cb=st[i][1],t=(v-a)/(b-a);
+    const c=ca.map((x,j)=>Math.round(x+(cb[j]-x)*t)); return "rgb("+c[0]+","+c[1]+","+c[2]+")"; } }
+  return "rgb(63,185,107)";
+}
+function inkOn(name,isTC){ if(isTC) return "#ffffff"; return (name==="Amarillo"||name==="Gris")?"#1a2238":"#ffffff"; }
+
+function drawSankeyBase(svgId, rows){
+  const svg=d3.select(svgId); svg.selectAll("*").remove();
+  PIN=false; HOVERON=false; svg.on("click", _chartClick);
+  const isTC = rows.every(r=>r.op_type==="B");
+  if(rows.length===0){ svg.attr("viewBox","0 0 1180 200"); svg.append("text").attr("x",590).attr("y",100).attr("text-anchor","middle").attr("fill","var(--muted)").attr("font-size",15).text("No hay operaciones de este tipo."); return; }
+
+  const ops=(()=>{
+    const arr=[...new Set(rows.map(r=>r.op))];
+    const erIdx={}; let _k=0; STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>{ if(!(er in erIdx)) erIdx[er]=_k++; })));
+    const keyOf=op=>{ let m=Infinity; rows.forEach(r=>{ if(r.op===op&&r.conn==="YES"&&(r.er in erIdx)) m=Math.min(m,erIdx[r.er]); }); return m; };
+    return arr.map(op=>({op,k:keyOf(op)})).sort((a,b)=> (a.k-b.k) || (arr.indexOf(a.op)-arr.indexOf(b.op))).map(x=>x.op);
+  })();
+  // OE alineados (los que tienen al menos una conexión YES) -> círculos
+  const oeAll=[]; rows.forEach(r=>{const k=r.op+"|"+r.oe_id; if(!oeAll.find(o=>o.key===k)) oeAll.push({key:k,op:r.op,oe_id:r.oe_id,oe:r.oe});});
+  const oeConnected = oeAll.filter(o => rows.some(r=>r.op===o.op&&r.oe_id===o.oe_id&&r.conn==="YES"));
+  // Operaciones que no tienen NINGÚN OE alineado -> se muestran solas en gris
+  const opsAlineadas = new Set(oeConnected.map(o=>o.op));
+
+  // ER presentes en los datos (con alineación), ordenados por STRATEGY (pilar/obj)
+  const ersData = new Set(rows.filter(r=>r.conn==="YES"&&r.er&&r.er!=="None").map(r=>r.er));
+  // Estructura visible: TODA la estrategia (pilares/objetivos/ER), marcando cuáles quedaron sin alinear.
+  const erAligned = er => ersData.has(er);
+  const visPilares=[];
+  STRATEGY.forEach(p=>{
+    const objs=[];
+    p.objetivos.forEach(o=>{
+      const ers=o.ers.slice();                    // todos los ER del objetivo
+      const anyAl=ers.some(erAligned);
+      objs.push({obj:o.obj, ers, aligned:anyAl});  // objetivo sin alinear = ningún ER alineado
+    });
+    if(objs.length) visPilares.push({pilar:p.pilar, objetivos:objs});
+  });
+
+  // Layout
+  const rowH=50, padTop=90, padBot=40, gapObj=16, gapPilar=30, pilarLabelH=26, objLabelH=0;
+  const colOps=250, colOE=70, colER=770, colObj=1140;
+  const wOps=150, wER=330, wObj=250, rCircle=13;
+
+  // Y de ER (agrupados por pilar/obj), y posición de objetivos
+  const yER={}; const objBox=[]; const pilarBox=[];
+  let cursor=padTop;
+  visPilares.forEach(p=>{
+    const pTop=cursor;
+    cursor+=pilarLabelH;
+    p.objetivos.forEach(o=>{
+      const oTop=cursor;
+      o.ers.forEach((er,i)=>{ yER[er]=cursor+rowH/2; cursor+=rowH; });
+      const oBot=cursor;
+      objBox.push({obj:o.obj, top:oTop, bot:oBot, yc:(oTop+oBot)/2, pilar:p.pilar, aligned:o.aligned});
+      cursor+=gapObj;
+    });
+    cursor+=gapPilar;
+    pilarBox.push({pilar:p.pilar, top:pTop, bot:cursor-gapPilar});
+  });
+  const erBlockH=cursor;
+
+  // Y de operaciones y OE (columna izquierda): agrupar OE bajo su operación
+  // Cada operación ocupa el alto de sus OE-círculos (o 1 si va sola en gris)
+  const opLayout=[]; let oy=padTop;
+  ops.forEach(op=>{
+    // Todos los RE de la operación (alineados y no). Los no alineados se muestran como círculos desconectados.
+    const oesAll=oeAll.filter(o=>o.op===op && o.oe_id);
+    const alignedSet=new Set(oeConnected.filter(o=>o.op===op).map(o=>o.oe_id));
+    const oes=oesAll.map(o=>({...o, aligned:alignedSet.has(o.oe_id)}))
+                    .sort((a,b)=> (a.aligned===b.aligned?0:(a.aligned?-1:1)) || a.oe_id.localeCompare(b.oe_id,undefined,{numeric:true}));
+    const solaGris = !opsAlineadas.has(op);
+    const n = solaGris ? 1 : oes.length;
+    const blockTop=oy;
+    const circles=[];
+    if(!solaGris){
+      oes.forEach((o,i)=>{ circles.push({...o, y: oy + i*(rCircle*2+6) + rCircle}); });
+      oy += n*(rCircle*2+6) + 18;
+    } else {
+      oy += rowH + 10;
+    }
+    const blockBot=oy;
+    opLayout.push({op, solaGris, circles, yc:(blockTop+blockBot)/2 - (solaGris?0:0)});
+  });
+  const opsBlockH=oy;
+
+  const maxH=Math.max(erBlockH, opsBlockH, padTop) + padBot;
+  svg.attr("viewBox",`0 0 1300 ${maxH}`);
+
+  // Encabezados
+  svg.append("text").attr("class","colhead").attr("x",colOps).attr("y",58).attr("text-anchor","middle").text("Operaciones");
+  if(!isTC){ const chOE=svg.append("text").attr("class","colhead").attr("x",colOE).attr("y",40).attr("text-anchor","middle"); chOE.append("tspan").attr("x",colOE).text("RESULTADO"); chOE.append("tspan").attr("x",colOE).attr("dy",13).text("ESPERADO DE LA"); chOE.append("tspan").attr("x",colOE).attr("dy",13).text("OPERACIÓN"); }
+  svg.append("text").attr("class","colhead").attr("x",colER).attr("y",58).attr("text-anchor","middle").text("Resultado esperado de la estrategia");
+  svg.append("text").attr("class","colhead").attr("x",colObj).attr("y",58).attr("text-anchor","middle").text("Objetivo estratégico");
+
+  // Bandas de pilar (fondo blanco) alrededor de los ER
+  pilarBox.forEach(pb=>{
+    svg.append("rect").attr("x",colER-wER/2-14).attr("y",pb.top-4).attr("width",(colObj+wObj/2)-(colER-wER/2)+28).attr("height",pb.bot-pb.top+8).attr("rx",12).attr("fill","#ffffff").attr("opacity",0.65);
+    svg.append("text").attr("class","pilar-label").attr("x",colER-wER/2-6).attr("y",pb.top+16).attr("fill","var(--accent)").text("PILAR: "+pb.pilar.toUpperCase().slice(0,95));
+  });
+
+  const linkLayer=svg.append("g");
+  const allLinks=[];
+
+  // Links Operación -> ER (una sola línea por operación y ER)
+  opLayout.forEach(ol=>{
+    if(ol.solaGris) return;
+    const ers=[...new Set(rows.filter(r=>r.op===ol.op && r.conn==="YES" && r.er && r.er!=="None" && yER[r.er]!==undefined).map(r=>r.er))];
+    ers.forEach(er=>{
+      const rel=rows.filter(r=>r.op===ol.op && r.er===er && r.conn==="YES");
+      const strong=rel.some(r=>r.align==="Strong");
+      const col=strong?"#1f4f8a":"#7fb2e5";
+      const x1=colOps+wOps/2, y1=ol.yc, x2=colER-wER/2, y2=yER[er];
+      const oeList=rel.map(r=>r.oe_id.replace("OE","RE")).join(", ");
+      const _why=(rel.find(r=>r.align==="Strong")||rel.find(r=>r.reasoning&&r.reasoning.trim())||{}).reasoning||"";
+      const path=linkLayer.append("path").attr("class","link").attr("d",curve(x1,y1,x2,y2))
+        .attr("stroke",col).attr("stroke-width",strong?3:1.6).attr("stroke-dasharray",(!isTC&&!strong)?"4,4":null).attr("opacity",0.78)
+        .attr("data-op",ol.op).attr("data-er",er);
+      path.on("mouseover",ev=>showTip(`<b>${ol.op}</b> → ${er}<br>Alineación: <b>${strong?"Strong":"Weak"}</b>`+(_why?`<br><br><span style='color:#dfe7f2'>${_why}</span>`:""),ev))
+        .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",hideTip);
+      allLinks.push({path,op:ol.op,er});
+    });
+  });
+
+  // Links Operación -> Objetivo (filas cuyo related_er es un Objetivo, no un RE)
+  if(SHOW_OBJ_LINKS){
+    const objYc={}; objBox.forEach(ob=>{ objYc[ob.obj]=ob.yc; });
+    opLayout.forEach(ol=>{
+      if(ol.solaGris) return;
+      const objsDir=[...new Set(rows.filter(r=>r.op===ol.op && r.conn==="YES" && isObjRef(r.er) && objYc[objOf(r.er)]!==undefined).map(r=>objOf(r.er)))];
+      objsDir.forEach(obj=>{
+        const rel=rows.filter(r=>r.op===ol.op && objOf(r.er)===obj && r.conn==="YES");
+        const strong=rel.some(r=>r.align==="Strong");
+        const x1=colOps+wOps/2, y1=ol.yc, xc=colObj-wObj/2-24, x2=colObj-wObj/2, y2=objYc[obj];
+        const d=`M${x1},${y1} C${xc},${y1} ${xc},${y2} ${x2},${y2}`;
+        const oeList=rel.map(r=>r.oe_id.replace("OE","RE")).filter(Boolean).join(", ")||"—";
+        const objCol = strong ? "#1f4f8a" : "#7fb2e5";   // color de alineación; sólida=fuerte, punteada=débil
+        const path=linkLayer.append("path").attr("class","link objlink").attr("d",d)
+          .attr("fill","none").attr("stroke",objCol).attr("stroke-width",strong?1.6:1.2)
+          .attr("stroke-dasharray",strong?null:"4,4")
+          .attr("data-op",ol.op).attr("data-obj",obj);
+        path.on("mouseover",ev=>showTip(`<b>${ol.op}</b> → <i>Objetivo</i>: ${obj}<br>Alineación: <b>${strong?"Strong":"Weak"}</b><br><span style='color:#c8cfdc'>Alineación a nivel de objetivo (sin RE específico)</span><br><span style='color:#c8cfdc'>RE op.: ${oeList}</span>`,ev))
+          .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",hideTip);
+        allLinks.push({path,op:ol.op,er:OBJ_PREFIX+obj,obj:obj,isObj:true});
+      });
+    });
+  }
+
+  // Calificación del RE (I.2): Fuerte si ops fuertes >= ops débiles (empate=Fuerte); si no, Débil.
+  const erRating={};
+  Object.keys(yER).forEach(er=>{
+    const opsER=[...new Set(rows.filter(r=>r.conn==="YES"&&r.er===er&&r.op_type==="A").map(r=>r.op))];
+    let sN=0,wN=0;
+    opsER.forEach(op=>{ (rows.some(r=>r.op===op&&r.er===er&&r.conn==="YES"&&r.align==="Strong")?sN++:wN++); });
+    erRating[er]= opsER.length===0 ? "Sin" : (sN>=wN ? "Fuerte" : "Débil");
+  });
+  // Calificación del objetivo (I.3): Fuerte si al menos un RE del objetivo es Fuerte.
+  const objFuerte={};
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>{ objFuerte[o.obj]=o.ers.some(er=>erRating[er]==="Fuerte"); }));
+  // Links ER -> Objetivo estratégico
+  objBox.forEach(ob=>{
+    STRATEGY.forEach(p=>p.objetivos.forEach(o=>{
+      if(o.obj!==ob.obj) return;
+      o.ers.forEach(er=>{ if(yER[er]===undefined) return;
+        const x1=colER+wER/2, y1=yER[er], x2=colObj-wObj/2, y2=ob.yc;
+        const p=linkLayer.append("path").attr("class","link").attr("d",curve(x1,y1,x2,y2))
+          .attr("stroke","#c59dd4").attr("stroke-width",2).attr("stroke-dasharray",(!isTC&&erRating[er]!=="Fuerte")?"4,4":null).attr("opacity",0.5);
+        allLinks.push({path:p, er:er, obj:ob.obj, isErObj:true});
+      });
+    }));
+  });
+
+  // Nodos: operaciones + círculos OE
+  opLayout.forEach(ol=>{
+    const g=svg.append("g").attr("data-node-op",ol.op);
+    const pipe = isPipeline(ol.op);
+    const opColor = pipe ? "#ffffff" : (ol.solaGris ? "#c9d2de" : "#1f4f8a");
+    g.append("rect").attr("class","node-rect").attr("x",colOps-wOps/2).attr("y",ol.yc-14).attr("width",wOps).attr("height",28).attr("rx",6)
+      .attr("fill",opColor).attr("opacity",pipe?1:(ol.solaGris?0.8:0.92))
+      .attr("stroke", pipe?"#1f4f8a":"none").attr("stroke-width", pipe?1.6:0);
+    g.append("text").attr("class","node-label").attr("x",colOps).attr("y",ol.yc+4).attr("text-anchor","middle").style("fill",pipe?"#1f4f8a":(ol.solaGris?"#1a2238":"#ffffff")).style("font-weight",700).text(ol.op);
+    if(!ol.solaGris) g.style("cursor","pointer")
+      .on("mouseover",ev=>{ hoverByOp(ol.op); })
+      .on("mouseout",()=>clearHover());
+    // círculos OE (los no alineados se dibujan sin línea, como círculos desconectados)
+    if(!isTC) ol.circles.forEach(c=>{
+      const rel=rows.filter(r=>r.op===c.op&&r.oe_id===c.oe_id&&r.conn==="YES");
+      const anyStrong=rel.some(r=>r.align==="Strong");
+      const col=anyStrong?"#1f4f8a":"#7fb2e5";
+      if(c.aligned){
+        // línea corta operación -> círculo
+        svg.append("path").attr("class","link shortlink").attr("data-circle-op",c.op).attr("d",curve(colOE+rCircle, c.y, colOps-wOps/2, ol.yc)).attr("stroke",col).attr("stroke-width",2).attr("stroke-dasharray",anyStrong?null:"4,4").attr("opacity",0.55);
+      }
+      const cg=svg.append("g").attr("data-circle-op",c.op).attr("data-circle-aligned", c.aligned?"1":"0");
+      cg.append("circle").attr("class","node-rect").attr("cx",colOE).attr("cy",c.y).attr("r",rCircle)
+        .attr("fill", c.aligned?col:"#e7e9ee").attr("opacity", c.aligned?0.92:0.9)
+        .attr("stroke", c.aligned?"none":"#9aa7bd").attr("stroke-width",1.2).attr("stroke-dasharray", c.aligned?null:"3,2");
+      cg.append("text").attr("class","oe-circle-label").attr("x",colOE).attr("y",c.y+3).attr("text-anchor","middle").style("fill", c.aligned?null:"#5d6b85").text(c.oe_id.replace("OE","RE"));
+      cg.style("cursor","pointer").on("mouseover",ev=>{ showTip(`<b>${c.op} · ${c.oe_id.replace("OE","RE")}</b><br>${c.oe}`+(c.aligned?"":"<br><span style='color:#f0c060'>RE sin alinear</span>"),ev); hoverByOp(c.op); })
+        .on("mousemove",ev=>showTip(tip.html(),ev))
+        .on("mouseout",()=>{ hideTip(); clearHover(); });
+    });
+  });
+
+  // Nodos ER  (los no alineados: mismo texto, fondo claro y borde punteado)
+  Object.keys(yER).forEach(er=>{
+    const al = ersData.has(er);
+    const g=svg.append("g").attr("data-node-er",er);
+    const _lines=wrapLabel(er,46,2);
+    const _h=_lines.length>1?42:28;
+    g.append("rect").attr("class","node-rect").attr("x",colER-wER/2).attr("y",yER[er]-_h/2).attr("width",wER).attr("height",_h).attr("rx",6)
+      .attr("fill", al?"#c59dd4":"#e7e9ee").attr("opacity", al?0.44:0.9)
+      .attr("stroke","#1f4f8a").attr("stroke-width",1.2).attr("stroke-dasharray", al?null:"4,3").attr("stroke-opacity", al?1:0.55);
+    const _ty=yER[er]-(_lines.length-1)*7+4;
+    _lines.forEach((ln,ix)=>g.append("text").attr("class","node-label").attr("x",colER-wER/2+8).attr("y",_ty+ix*14).text(ln));
+    g.style("cursor","pointer")
+     .on("mouseover",ev=>{ showTip(`<b>${er}</b>`+(al?"":"<br><span style='color:#f0c060'>Sin operaciones alineadas</span>"),ev); hoverByEr(er); })
+     .on("mousemove",ev=>showTip(tip.html(),ev))
+     .on("mouseout",()=>{ hideTip(); clearHover(); });
+  });
+
+  // Nodos Objetivo estratégico
+  const objOpCount={};  // obj -> nº de operaciones alineadas a nivel de objetivo
+  allLinks.forEach(l=>{ if(l.isObj){ (objOpCount[l.obj]=objOpCount[l.obj]||new Set()).add(l.op); } });
+  objBox.forEach(ob=>{
+    const alObj = (ob.aligned!==undefined) ? ob.aligned : true;
+    const g=svg.append("g").attr("data-node-obj",ob.obj);
+    g.append("rect").attr("class","node-rect").attr("x",colObj-wObj/2).attr("y",ob.yc-22).attr("width",wObj).attr("height",44).attr("rx",6)
+      .attr("fill", alObj?"#c4b799":"#e7e9ee").attr("opacity", alObj?0.28:0.9)
+      .attr("stroke", alObj?"none":"#1f4f8a").attr("stroke-width",1.2).attr("stroke-dasharray", alObj?null:"4,3").attr("stroke-opacity", alObj?1:0.55);
+    const label=ob.obj.length>84?ob.obj.slice(0,82)+"…":ob.obj;
+    g.append("text").attr("class","node-label").attr("x",colObj-wObj/2+8).attr("y",ob.yc-2).attr("font-weight",600).attr("fill",alObj?null:"#5d6b85").text(label.slice(0,42));
+    if(label.length>42) g.append("text").attr("class","node-label").attr("x",colObj-wObj/2+8).attr("y",ob.yc+12).attr("font-weight",600).attr("fill",alObj?null:"#5d6b85").text(label.slice(42,84));
+    // Badge "+N": nº de operaciones alineadas a este objetivo a nivel de objetivo (sin RE específico)
+    const nOps = objOpCount[ob.obj] ? objOpCount[ob.obj].size : 0;
+    g.style("cursor","pointer")
+     .on("mouseover",ev=>{ showTip(`<b>Objetivo estratégico:</b><br>${ob.obj}`+(nOps?`<br><span style='color:#c8cfdc'>${nOps} operación(es) alineada(s) a nivel de objetivo</span>`:"")+(alObj?"":"<br><span style='color:#f0c060'>Sin Resultados Esperados alineados</span>"),ev); hoverByObj(ob.obj); })
+     .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",()=>{ hideTip(); clearHover(); });
+    if(nOps>0){
+      const bg=svg.append("g").attr("class","obj-badge").attr("data-badge-obj",ob.obj).style("cursor","pointer");
+      const bx=colObj+wObj/2-13, by=ob.yc-22-2;
+      bg.append("circle").attr("cx",bx).attr("cy",by).attr("r",11);
+      bg.append("text").attr("x",bx).attr("y",by+3.5).attr("text-anchor","middle").text("+"+nOps);
+      bg.on("mouseover",ev=>{ showTip(`<b>+${nOps} operación(es)</b> alineada(s) a este objetivo a nivel de objetivo (sin RE específico). Pasá el mouse para ver cuáles.`,ev); hoverByObj(ob.obj); })
+        .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",()=>{ hideTip(); clearHover(); });
+    }
+  });
+
+  /* ===== Sistema de resaltado (hover) centralizado ===== */
+  function _dimAllExcept(opSet, erSet, objSet){
+    svg.selectAll("[data-node-op]").classed("node-dim", function(){ return !opSet.has(this.getAttribute("data-node-op")); });
+    svg.selectAll("[data-node-er]").classed("node-dim", function(){ return !erSet.has(this.getAttribute("data-node-er")); });
+    svg.selectAll("[data-node-obj]").classed("node-dim", function(){ return !objSet.has(this.getAttribute("data-node-obj")); });
+    // Circulitos RE de la operación: se atenúan si su operación no está activa.
+    svg.selectAll("g[data-circle-op]").classed("node-dim", function(){ return !opSet.has(this.getAttribute("data-circle-op")); });
+    // Líneas cortas op→círculo: igual criterio.
+    svg.selectAll("path.shortlink[data-circle-op]").classed("dim", function(){ return !opSet.has(this.getAttribute("data-circle-op")); });
+  }
+  function hoverByOp(op){ if(PIN) return; HOVERON=true;
+    // Primera pasada: RE y objetivos que toca la operación (por sus líneas op→RE y op→objetivo)
+    const erSet=new Set(), objSet=new Set();
+    allLinks.forEach(l=>{ if((l.isObj||!l.isErObj) && l.op===op){ if(l.isObj) objSet.add(l.obj); else erSet.add(l.er); } });
+    // También los objetivos dueños de los RE que toca la operación (cadena op→RE→objetivo)
+    erSet.forEach(er=>{ if(erIndex[er] && erIndex[er].obj) objSet.add(erIndex[er].obj); });
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isErObj) on = erSet.has(l.er);          // RE→obj: solo las de los RE que toca la op
+      else on = (l.op===op);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", on);
+    });
+    _dimAllExcept(new Set([op]), erSet, objSet);
+  }
+  function hoverByEr(er){ if(PIN) return; HOVERON=true;
+    const opSet=new Set();
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isErObj) on = (l.er===er);              // RE→obj de ESTE er
+      else if(l.isObj) on = false;                 // líneas op→objetivo: no
+      else on = (l.er===er);                       // op→RE de ESTE er
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", false);
+      if(on && !l.isErObj && !l.isObj) opSet.add(l.op);
+    });
+    const owner = erIndex[er] ? erIndex[er].obj : null;
+    _dimAllExcept(opSet, new Set([er]), owner?new Set([owner]):new Set());
+  }
+  function hoverByObj(obj){ if(PIN) return; HOVERON=true;
+    // Resalta TODA la cadena que llega a este objetivo: líneas directas op→objetivo,
+    // y también la cadena op→RE→objetivo de los RE que cuelgan de este objetivo.
+    const opSet=new Set(), erSet=new Set();
+    Object.keys(erIndex).forEach(er=>{ if(erIndex[er] && erIndex[er].obj===obj) erSet.add(er); });
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isObj) on = (l.obj===obj);
+      else if(l.isErObj) on = (l.obj===obj);
+      else on = erSet.has(l.er);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", on);
+      if(on){ if(l.op) opSet.add(l.op); if(l.er && !l.isObj) erSet.add(l.er); }
+    });
+    _dimAllExcept(opSet, erSet, new Set([obj]));
+  }
+  function clearHover(){ if(PIN) return; HOVERON=false;
+    allLinks.forEach(l=>{ l.path.classed("dim",false); if(l.isObj) l.path.classed("show",false); });
+    svg.selectAll(".node-dim").classed("node-dim",false);
+    svg.selectAll("path.shortlink").classed("dim",false);
+  }
+}
+
+/* Despacho: con COLOR_OE cargado usa la versión coloreada; vacío, la simple. */
+function drawSankey(svgId, rows){ return HAS_COLORS ? drawSankeyColor(svgId, rows) : drawSankeyBase(svgId, rows); }
+
+function drawSankeyColor(svgId, rows){
+  const svg=d3.select(svgId); svg.selectAll("*").remove();
+  PIN=false; HOVERON=false; svg.on("click", _chartClick);
+  if(rows.length===0){ svg.attr("viewBox","0 0 1180 200"); svg.append("text").attr("x",590).attr("y",100).attr("text-anchor","middle").attr("fill","var(--muted)").attr("font-size",15).text("No hay operaciones de este tipo."); return; }
+
+  const ops=(()=>{
+    const arr=[...new Set(rows.map(r=>r.op))];
+    const erIdx={}; let _k=0; STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>{ if(!(er in erIdx)) erIdx[er]=_k++; })));
+    const keyOf=op=>{ let m=Infinity; rows.forEach(r=>{ if(r.op===op&&r.conn==="YES"&&(r.er in erIdx)) m=Math.min(m,erIdx[r.er]); }); return m; };
+    return arr.map(op=>({op,k:keyOf(op)})).sort((a,b)=> (a.k-b.k) || (arr.indexOf(a.op)-arr.indexOf(b.op))).map(x=>x.op);
+  })();
+  const isTC = rows.every(r=>r.op_type==="B");   // pestaña de Cooperaciones Técnicas
+  // OE alineados (los que tienen al menos una conexión YES) -> círculos
+  const oeAll=[]; rows.forEach(r=>{const k=r.op+"|"+r.oe_id; if(!oeAll.find(o=>o.key===k)) oeAll.push({key:k,op:r.op,oe_id:r.oe_id,oe:r.oe});});
+  const oeConnected = oeAll.filter(o => rows.some(r=>r.op===o.op&&r.oe_id===o.oe_id&&r.conn==="YES"));
+  // Operaciones que no tienen NINGÚN OE alineado -> se muestran solas en gris
+  const opsAlineadas = new Set(oeConnected.map(o=>o.op));
+
+  // ER presentes en los datos (con alineación), ordenados por STRATEGY (pilar/obj)
+  const ersData = new Set(rows.filter(r=>r.conn==="YES"&&r.er&&r.er!=="None").map(r=>r.er));
+  // Estructura visible: TODA la estrategia (pilares/objetivos/ER), marcando cuáles quedaron sin alinear.
+  const erAligned = er => ersData.has(er);
+  const visPilares=[];
+  STRATEGY.forEach(p=>{
+    const objs=[];
+    p.objetivos.forEach(o=>{
+      const ers=o.ers.slice();                    // todos los ER del objetivo
+      const anyAl=ers.some(erAligned);
+      objs.push({obj:o.obj, ers, aligned:anyAl});  // objetivo sin alinear = ningún ER alineado
+    });
+    if(objs.length) visPilares.push({pilar:p.pilar, objetivos:objs});
+  });
+
+  // Layout
+  const rowH=50, padTop=90, padBot=40, gapObj=16, gapPilar=30, pilarLabelH=26, objLabelH=0;
+  const colOps=250, colOE=70, colER=770, colObj=1140;
+  const wOps=150, wER=330, wObj=250, rCircle=13;
+
+  // Y de ER (agrupados por pilar/obj), y posición de objetivos
+  const yER={}; const objBox=[]; const pilarBox=[];
+  let cursor=padTop;
+  visPilares.forEach(p=>{
+    const pTop=cursor;
+    cursor+=pilarLabelH;
+    p.objetivos.forEach(o=>{
+      const oTop=cursor;
+      o.ers.forEach((er,i)=>{ yER[er]=cursor+rowH/2; cursor+=rowH; });
+      const oBot=cursor;
+      objBox.push({obj:o.obj, top:oTop, bot:oBot, yc:(oTop+oBot)/2, pilar:p.pilar, aligned:o.aligned});
+      cursor+=gapObj;
+    });
+    cursor+=gapPilar;
+    pilarBox.push({pilar:p.pilar, top:pTop, bot:cursor-gapPilar});
+  });
+  const erBlockH=cursor;
+
+  // Y de operaciones y OE (columna izquierda): agrupar OE bajo su operación
+  // Cada operación ocupa el alto de sus OE-círculos (o 1 si va sola en gris)
+  const opLayout=[]; let oy=padTop;
+  ops.forEach(op=>{
+    // Todos los RE de la operación (alineados y no). Los no alineados se muestran como círculos desconectados.
+    const oesAll=oeAll.filter(o=>o.op===op && o.oe_id);
+    const alignedSet=new Set(oeConnected.filter(o=>o.op===op).map(o=>o.oe_id));
+    const oes=oesAll.map(o=>({...o, aligned:alignedSet.has(o.oe_id)}))
+                    .sort((a,b)=> (a.aligned===b.aligned?0:(a.aligned?-1:1)) || a.oe_id.localeCompare(b.oe_id,undefined,{numeric:true}));
+    const solaGris = !opsAlineadas.has(op);
+    const n = solaGris ? 1 : oes.length;
+    const blockTop=oy;
+    const circles=[];
+    if(!solaGris){
+      oes.forEach((o,i)=>{ circles.push({...o, y: oy + i*(rCircle*2+6) + rCircle}); });
+      oy += n*(rCircle*2+6) + 18;
+    } else {
+      oy += rowH + 10;
+    }
+    const blockBot=oy;
+    opLayout.push({op, solaGris, circles, yc:(blockTop+blockBot)/2 - (solaGris?0:0)});
+  });
+  const opsBlockH=oy;
+
+  const maxH=Math.max(erBlockH, opsBlockH, padTop) + padBot;
+  svg.attr("viewBox",`0 0 1300 ${maxH}`);
+  // Promedios continuos (solo tipo A). Ahora el color del ER de estrategia y sus líneas
+  // se calcula SOLO con los RE de operación efectivamente alineados a ese ER (op|oe_id),
+  // no con el promedio de toda la operación. Mezcla continua entre esos RE.
+  const erAvg={}, objAvg={};
+  // valores de los RE alineados a cada ER de estrategia: er -> [valores]
+  const erVals={};
+  if(!isTC){
+    rows.forEach(r=>{
+      if(r.conn!=="YES"||!r.er||r.er==="None") return;
+      // valor del RE específico; si el oe_id no tiene color propio, cae al promedio de la op
+      let v=oeValue(r.op,r.oe_id);
+      if(v==null) v=opMeanValue(r.op);
+      if(v==null) return;
+      (erVals[r.er]=erVals[r.er]||[]).push(v);
+    });
+    Object.keys(yER).forEach(er=>{
+      const vals=erVals[er]||[];
+      erAvg[er]= vals.length? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+    });
+    objBox.forEach(ob=>{
+      const ersObj=[]; STRATEGY.forEach(p=>p.objetivos.forEach(o=>{ if(o.obj===ob.obj) ersObj.push(...o.ers); }));
+      const vals=[]; ersObj.forEach(er=>{ (erVals[er]||[]).forEach(v=>vals.push(v)); });
+      objAvg[ob.obj]= vals.length? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+    });
+  }
+
+  // Encabezados
+  svg.append("text").attr("class","colhead").attr("x",colOps).attr("y",58).attr("text-anchor","middle").text("Operaciones");
+  if(!isTC){ const chOE=svg.append("text").attr("class","colhead").attr("x",colOE).attr("y",40).attr("text-anchor","middle"); chOE.append("tspan").attr("x",colOE).text("RESULTADO"); chOE.append("tspan").attr("x",colOE).attr("dy",13).text("ESPERADO DE LA"); chOE.append("tspan").attr("x",colOE).attr("dy",13).text("OPERACIÓN"); }
+  svg.append("text").attr("class","colhead").attr("x",colER).attr("y",58).attr("text-anchor","middle").text("Resultado esperado de la estrategia");
+  svg.append("text").attr("class","colhead").attr("x",colObj).attr("y",58).attr("text-anchor","middle").text("Objetivo estratégico");
+
+  // Bandas de pilar (fondo blanco) alrededor de los ER
+  pilarBox.forEach(pb=>{
+    svg.append("rect").attr("x",colER-wER/2-14).attr("y",pb.top-4).attr("width",(colObj+wObj/2)-(colER-wER/2)+28).attr("height",pb.bot-pb.top+8).attr("rx",12).attr("fill","#ffffff").attr("opacity",0.65);
+    svg.append("text").attr("class","pilar-label").attr("x",colER-wER/2-6).attr("y",pb.top+16).attr("fill","var(--accent)").text("PILAR: "+pb.pilar.toUpperCase().slice(0,95));
+  });
+
+  const linkLayer=svg.append("g");
+  const allLinks=[];
+
+  // Links Operación -> ER (una sola línea por operación y ER)
+  opLayout.forEach(ol=>{
+    if(ol.solaGris) return;
+    const ers=[...new Set(rows.filter(r=>r.op===ol.op && r.conn==="YES" && r.er && r.er!=="None" && yER[r.er]!==undefined).map(r=>r.er))];
+    ers.forEach(er=>{
+      const rel=rows.filter(r=>r.op===ol.op && r.er===er && r.conn==="YES");
+      // Color de la línea: mezcla continua de los RE de operación alineados a ESTE er.
+      let lineCol;
+      if(isTC){ lineCol=TC_HEX; }
+      else {
+        const vals=rel.map(r=>oeValue(r.op,r.oe_id)).filter(v=>v!=null);
+        const v = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : opMeanValue(ol.op);
+        lineCol = contHex(v);
+      }
+      const strong=rel.some(r=>r.align==="Strong");
+      const x1=colOps+wOps/2, y1=ol.yc, x2=colER-wER/2, y2=yER[er];
+      const oeList=rel.map(r=>r.oe_id.replace("OE","RE")).join(", ");
+      const _why=(rel.find(r=>r.align==="Strong")||rel.find(r=>r.reasoning&&r.reasoning.trim())||{}).reasoning||"";
+      const path=linkLayer.append("path").attr("class","link").attr("d",curve(x1,y1,x2,y2))
+        .attr("stroke",lineCol).attr("stroke-width",strong?3:1.6).attr("stroke-dasharray",(!isTC&&!strong)?"4,4":null).attr("opacity",0.8)
+        .attr("data-op",ol.op).attr("data-er",er);
+      path.on("mouseover",ev=>showTip(`<b>${ol.op}</b> → ${er}<br>Alineación: <b>${strong?"Strong":"Weak"}</b>`+(_why?`<br><br><span style='color:#dfe7f2'>${_why}</span>`:""),ev))
+        .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",hideTip);
+      allLinks.push({path,op:ol.op,er});
+    });
+  });
+
+  // Links Operación -> Objetivo (filas cuyo related_er es un Objetivo, no un RE)
+  if(SHOW_OBJ_LINKS){
+    const objYc={}; objBox.forEach(ob=>{ objYc[ob.obj]=ob.yc; });
+    opLayout.forEach(ol=>{
+      if(ol.solaGris) return;
+      const objsDir=[...new Set(rows.filter(r=>r.op===ol.op && r.conn==="YES" && isObjRef(r.er) && objYc[objOf(r.er)]!==undefined).map(r=>objOf(r.er)))];
+      objsDir.forEach(obj=>{
+        const rel=rows.filter(r=>r.op===ol.op && objOf(r.er)===obj && r.conn==="YES");
+        const strong=rel.some(r=>r.align==="Strong");
+        const vals=rel.map(r=>oeValue(r.op,r.oe_id)).filter(v=>v!=null);
+        const v = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : opMeanValue(ol.op);
+        const lineCol = isTC ? TC_HEX : contHex(v);
+        const x1=colOps+wOps/2, y1=ol.yc, xc=colObj-wObj/2-24, x2=colObj-wObj/2, y2=objYc[obj];
+        const d=`M${x1},${y1} C${xc},${y1} ${xc},${y2} ${x2},${y2}`;
+        const oeList=rel.map(r=>r.oe_id.replace("OE","RE")).filter(Boolean).join(", ")||"—";
+        const path=linkLayer.append("path").attr("class","link objlink").attr("d",d)
+          .attr("fill","none").attr("stroke",lineCol).attr("stroke-width",strong?1.6:1.2)
+          .attr("stroke-dasharray",(!isTC&&!strong)?"4,4":null)
+          .attr("data-op",ol.op).attr("data-obj",obj);
+        path.on("mouseover",ev=>showTip(`<b>${ol.op}</b> → <i>Objetivo</i>: ${obj}<br>Alineación: <b>${strong?"Strong":"Weak"}</b><br><span style='color:#c8cfdc'>Alineación a nivel de objetivo (sin RE específico)</span><br><span style='color:#c8cfdc'>RE op.: ${oeList}</span>`,ev))
+          .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",hideTip);
+        allLinks.push({path,op:ol.op,er:OBJ_PREFIX+obj,obj:obj,isObj:true});
+      });
+    });
+  }
+
+  // Calificación del RE (I.2): Fuerte si ops fuertes >= ops débiles (empate=Fuerte); si no, Débil.
+  const erRating={};
+  Object.keys(yER).forEach(er=>{
+    const opsER=[...new Set(rows.filter(r=>r.conn==="YES"&&r.er===er&&r.op_type==="A").map(r=>r.op))];
+    let sN=0,wN=0;
+    opsER.forEach(op=>{ (rows.some(r=>r.op===op&&r.er===er&&r.conn==="YES"&&r.align==="Strong")?sN++:wN++); });
+    erRating[er]= opsER.length===0 ? "Sin" : (sN>=wN ? "Fuerte" : "Débil");
+  });
+  // Calificación del objetivo (I.3): Fuerte si al menos un RE del objetivo es Fuerte.
+  const objFuerte={};
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>{ objFuerte[o.obj]=o.ers.some(er=>erRating[er]==="Fuerte"); }));
+  // Links ER -> Objetivo estratégico
+  objBox.forEach(ob=>{
+    STRATEGY.forEach(p=>p.objetivos.forEach(o=>{
+      if(o.obj!==ob.obj) return;
+      o.ers.forEach(er=>{ if(yER[er]===undefined) return;
+        const x1=colER+wER/2, y1=yER[er], x2=colObj-wObj/2, y2=ob.yc;
+        const p=linkLayer.append("path").attr("class","link").attr("d",curve(x1,y1,x2,y2))
+          .attr("stroke", isTC?"#c59dd4":contHex(erAvg[er])).attr("stroke-width",2).attr("stroke-dasharray",(!isTC&&erRating[er]!=="Fuerte")?"4,4":null).attr("opacity", isTC?0.5:0.72);
+        allLinks.push({path:p, er:er, obj:ob.obj, isErObj:true});
+      });
+    }));
+  });
+
+  // Nodos: operaciones + círculos OE
+  opLayout.forEach(ol=>{
+    const g=svg.append("g").attr("data-node-op",ol.op);
+    const pipe = isPipeline(ol.op);
+    const opName = isTC ? "TC" : opColorName(ol.op);
+    const opColor = pipe ? "#ffffff" : (isTC ? TC_HEX : PROB_HEX[opName]);
+    g.append("rect").attr("class","node-rect").attr("x",colOps-wOps/2).attr("y",ol.yc-14).attr("width",wOps).attr("height",28).attr("rx",6)
+      .attr("fill",opColor).attr("opacity",pipe?1:0.95)
+      .attr("stroke", pipe?"#1f4f8a":"none").attr("stroke-width", pipe?1.6:0);
+    g.append("text").attr("class","node-label").attr("x",colOps).attr("y",ol.yc+4).attr("text-anchor","middle").style("fill",pipe?"#1f4f8a":inkOn(opName,isTC)).style("font-weight",700).text(ol.op);
+    if(!ol.solaGris) g.style("cursor","pointer")
+      .on("mouseover",ev=>{ hoverByOp(ol.op); })
+      .on("mouseout",()=>clearHover());
+    // círculos OE (los no alineados se dibujan sin línea; conservan su color si lo tienen)
+    if(!isTC) ol.circles.forEach(c=>{
+      const rel=rows.filter(r=>r.op===c.op&&r.oe_id===c.oe_id&&r.conn==="YES");
+      const anyStrong=rel.some(r=>r.align==="Strong");
+      const cname = isTC ? "TC" : oeColorName(c.op,c.oe_id);
+      const col = isTC ? TC_HEX : PROB_HEX[cname];
+      const hasColor = cname!=="Gris";
+      if(c.aligned){
+        // línea corta operación -> círculo (punteada si el OE no tiene alineación fuerte)
+        svg.append("path").attr("class","link shortlink").attr("data-circle-op",c.op).attr("d",curve(colOE+rCircle, c.y, colOps-wOps/2, ol.yc)).attr("stroke",col).attr("stroke-width",2).attr("stroke-dasharray",anyStrong?null:"4,4").attr("opacity",0.6);
+      }
+      const cg=svg.append("g").attr("data-circle-op",c.op).attr("data-circle-aligned", c.aligned?"1":"0");
+      cg.append("circle").attr("class","node-rect").attr("cx",colOE).attr("cy",c.y).attr("r",rCircle)
+        .attr("fill", col).attr("opacity", c.aligned?0.95:(hasColor?0.85:0.9))
+        .attr("stroke", c.aligned?"none":"#9aa7bd").attr("stroke-width",1.2).attr("stroke-dasharray", c.aligned?null:"3,2");
+      cg.append("text").attr("class","oe-circle-label").attr("x",colOE).attr("y",c.y+3).attr("text-anchor","middle").style("fill",inkOn(cname,isTC)).text(c.oe_id.replace("OE","RE"));
+      cg.style("cursor","pointer").on("mouseover",ev=>{ showTip(`<b>${c.op} · ${c.oe_id.replace("OE","RE")}</b><br>${c.oe}`+(c.aligned?"":"<br><span style='color:#f0c060'>RE sin alinear</span>"),ev); hoverByOp(c.op); })
+        .on("mousemove",ev=>showTip(tip.html(),ev))
+        .on("mouseout",()=>{ hideTip(); clearHover(); });
+    });
+  });
+
+  // Nodos ER  (los no alineados: mismo texto, fondo claro y borde punteado)
+  Object.keys(yER).forEach(er=>{
+    const al = ersData.has(er);
+    const g=svg.append("g").attr("data-node-er",er);
+    const _lines=wrapLabel(er,46,2);
+    const _h=_lines.length>1?42:28;
+    g.append("rect").attr("class","node-rect").attr("x",colER-wER/2).attr("y",yER[er]-_h/2).attr("width",wER).attr("height",_h).attr("rx",6)
+      .attr("fill", al?(isTC?"#c59dd4":contHex(erAvg[er])):"#e7e9ee").attr("opacity", al?(isTC?0.44:0.9):0.9)
+      .attr("stroke","#1f4f8a").attr("stroke-width",1.2).attr("stroke-dasharray", al?null:"4,3").attr("stroke-opacity", al?1:0.55);
+    const _ty=yER[er]-(_lines.length-1)*7+4;
+    _lines.forEach((ln,ix)=>g.append("text").attr("class","node-label").attr("x",colER-wER/2+8).attr("y",_ty+ix*14).text(ln));
+    g.style("cursor","pointer")
+     .on("mouseover",ev=>{ showTip(`<b>${er}</b>`+(al?"":"<br><span style='color:#f0c060'>Sin operaciones alineadas</span>"),ev); hoverByEr(er); })
+     .on("mousemove",ev=>showTip(tip.html(),ev))
+     .on("mouseout",()=>{ hideTip(); clearHover(); });
+  });
+
+  // Nodos Objetivo estratégico
+  const objOpCount={};
+  allLinks.forEach(l=>{ if(l.isObj){ (objOpCount[l.obj]=objOpCount[l.obj]||new Set()).add(l.op); } });
+  objBox.forEach(ob=>{
+    const alObj = (ob.aligned!==undefined) ? ob.aligned : true;
+    const g=svg.append("g").attr("data-node-obj",ob.obj);
+    g.append("rect").attr("class","node-rect").attr("x",colObj-wObj/2).attr("y",ob.yc-22).attr("width",wObj).attr("height",44).attr("rx",6)
+      .attr("fill", alObj?(isTC?"#c4b799":contHex(objAvg[ob.obj])):"#e7e9ee").attr("opacity", alObj?(isTC?0.28:0.82):0.9)
+      .attr("stroke", alObj?"none":"#1f4f8a").attr("stroke-width",1.2).attr("stroke-dasharray", alObj?null:"4,3").attr("stroke-opacity", alObj?1:0.55);
+    const label=ob.obj.length>84?ob.obj.slice(0,82)+"…":ob.obj;
+    g.append("text").attr("class","node-label").attr("x",colObj-wObj/2+8).attr("y",ob.yc-2).attr("font-weight",600).attr("fill",alObj?null:"#5d6b85").text(label.slice(0,42));
+    if(label.length>42) g.append("text").attr("class","node-label").attr("x",colObj-wObj/2+8).attr("y",ob.yc+12).attr("font-weight",600).attr("fill",alObj?null:"#5d6b85").text(label.slice(42,84));
+    const nOps = objOpCount[ob.obj] ? objOpCount[ob.obj].size : 0;
+    g.style("cursor","pointer")
+     .on("mouseover",ev=>{ showTip(`<b>Objetivo estratégico:</b><br>${ob.obj}`+(nOps?`<br><span style='color:#c8cfdc'>${nOps} operación(es) alineada(s) a nivel de objetivo</span>`:"")+(alObj?"":"<br><span style='color:#f0c060'>Sin Resultados Esperados alineados</span>"),ev); hoverByObj(ob.obj); })
+     .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",()=>{ hideTip(); clearHover(); });
+    if(nOps>0){
+      const bg=svg.append("g").attr("class","obj-badge").attr("data-badge-obj",ob.obj).style("cursor","pointer");
+      const bx=colObj+wObj/2-13, by=ob.yc-22-2;
+      bg.append("circle").attr("cx",bx).attr("cy",by).attr("r",11);
+      bg.append("text").attr("x",bx).attr("y",by+3.5).attr("text-anchor","middle").text("+"+nOps);
+      bg.on("mouseover",ev=>{ showTip(`<b>+${nOps} operación(es)</b> alineada(s) a este objetivo a nivel de objetivo (sin RE específico). Pasá el mouse para ver cuáles.`,ev); hoverByObj(ob.obj); })
+        .on("mousemove",ev=>showTip(tip.html(),ev)).on("mouseout",()=>{ hideTip(); clearHover(); });
+    }
+  });
+
+  /* ===== Sistema de resaltado (hover) centralizado ===== */
+  function _dimAllExcept(opSet, erSet, objSet){
+    svg.selectAll("[data-node-op]").classed("node-dim", function(){ return !opSet.has(this.getAttribute("data-node-op")); });
+    svg.selectAll("[data-node-er]").classed("node-dim", function(){ return !erSet.has(this.getAttribute("data-node-er")); });
+    svg.selectAll("[data-node-obj]").classed("node-dim", function(){ return !objSet.has(this.getAttribute("data-node-obj")); });
+    // Circulitos RE de la operación: se atenúan si su operación no está activa.
+    svg.selectAll("g[data-circle-op]").classed("node-dim", function(){ return !opSet.has(this.getAttribute("data-circle-op")); });
+    // Líneas cortas op→círculo: igual criterio.
+    svg.selectAll("path.shortlink[data-circle-op]").classed("dim", function(){ return !opSet.has(this.getAttribute("data-circle-op")); });
+  }
+  function hoverByOp(op){ if(PIN) return; HOVERON=true;
+    const erSet=new Set(), objSet=new Set();
+    allLinks.forEach(l=>{ if((l.isObj||!l.isErObj) && l.op===op){ if(l.isObj) objSet.add(l.obj); else erSet.add(l.er); } });
+    erSet.forEach(er=>{ if(erIndex[er] && erIndex[er].obj) objSet.add(erIndex[er].obj); });
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isErObj) on = erSet.has(l.er);
+      else on = (l.op===op);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", on);
+    });
+    _dimAllExcept(new Set([op]), erSet, objSet);
+  }
+  function hoverByEr(er){ if(PIN) return; HOVERON=true;
+    const opSet=new Set();
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isErObj) on = (l.er===er);
+      else if(l.isObj) on = false;
+      else on = (l.er===er);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", false);
+      if(on && !l.isErObj && !l.isObj) opSet.add(l.op);
+    });
+    const owner = erIndex[er] ? erIndex[er].obj : null;
+    _dimAllExcept(opSet, new Set([er]), owner?new Set([owner]):new Set());
+  }
+  function hoverByObj(obj){ if(PIN) return; HOVERON=true;
+    // Resalta TODA la cadena que llega a este objetivo: líneas directas op→objetivo,
+    // y también la cadena op→RE→objetivo de los RE que cuelgan de este objetivo.
+    const opSet=new Set(), erSet=new Set();
+    Object.keys(erIndex).forEach(er=>{ if(erIndex[er] && erIndex[er].obj===obj) erSet.add(er); });
+    allLinks.forEach(l=>{
+      let on;
+      if(l.isObj) on = (l.obj===obj);
+      else if(l.isErObj) on = (l.obj===obj);
+      else on = erSet.has(l.er);
+      l.path.classed("dim", !on);
+      if(l.isObj) l.path.classed("show", on);
+      if(on){ if(l.op) opSet.add(l.op); if(l.er && !l.isObj) erSet.add(l.er); }
+    });
+    _dimAllExcept(opSet, erSet, new Set([obj]));
+  }
+  function clearHover(){ if(PIN) return; HOVERON=false;
+    allLinks.forEach(l=>{ l.path.classed("dim",false); if(l.isObj) l.path.classed("show",false); });
+    svg.selectAll(".node-dim").classed("node-dim",false);
+    svg.selectAll("path.shortlink").classed("dim",false);
+  }
+}
+
+let drawnB=false;
+
+/* ===================== i18n (ES/EN) ===================== */
+var LANG = (function(){ try{ var e=document.getElementById('lang-src'); var v=e?e.textContent.trim():''; if(v && v.indexOf('@@')<0 && /ing/i.test(v)) return 'en'; }catch(x){} return 'es'; })();
+var _T = {
+  "Operaciones*":"Operations*","Cooperaciones Técnicas":"Technical Cooperations","Resumen por ER":"Summary by ER",
+  "Alineación agregada":"Aggregated alignment","Tabla completa":"Full table","Resumen ejecutivo":"Executive summary",
+  "📄 Cargar / reemplazar CSV del agente":"📄 Load / replace agent CSV","🎨 Cargar / reemplazar colores":"🎨 Load / replace colors",
+  "⬇ Descargar tabla (CSV para Excel)":"⬇ Download table (CSV for Excel)","📋 Copiar tabla":"📋 Copy table","⬇ Descargar (CSV para Excel)":"⬇ Download (CSV for Excel)",
+  "🔗 Alineaciones a objetivo: ON":"🔗 Objective-level alignments: ON","🔗 Alineaciones a objetivo: OFF":"🔗 Objective-level alignments: OFF",
+  "Datos precargados. Podés reemplazar el CSV del agente o los colores.":"Data preloaded. You can replace the agent CSV or the colors.",
+  "Operaciones":"Operations","Resultado esperado de la estrategia":"Strategy expected result","Objetivo estratégico":"Strategic objective",
+  "RESULTADO":"EXPECTED","ESPERADO DE LA":"RESULT OF THE","OPERACIÓN":"OPERATION",
+  "Operación":"Operation","Tipo":"Type","RE oper.":"Op. RE","Descripción RE":"RE description","ER estrategia":"Strategy ER",
+  "Pilar":"Pillar","Conex.":"Conn.","Factib.":"Feas.","Alineación":"Alignment","Justificación":"Rationale",
+  "Resultado Esperado (estrategia)":"Expected Result (strategy)","Cooperaciones":"Cooperations","Fuerte":"Strong","Débil":"Weak","Total":"Total",
+  "Tipo de operación":"Operation type","Cantidad":"Count","Operaciones (códigos)":"Operations (codes)","Total sin alineación":"Total unaligned",
+  "Ops. fuertes":"Strong ops","Ops. débiles":"Weak ops","Total alineadas":"Total aligned","Calificación del ER":"ER rating",
+  "Sin cobertura":"No coverage",
+  "Pilares en EBP":"Pillars in CS","Objetivos estratégicos en EBP":"Strategic objectives in CS",
+  "Resultados esperados en EBP":"Expected results in CS","Resultados esperados en EBP cubiertos":"Expected results in CS covered",
+  "Préstamos (INV + INV GR)*":"Loans (INV + INV GR)*",
+  "Operaciones sin alineación con la estrategia":"Operations with no alignment to the strategy"
+};
+var EN_HTML = {
+  "sub":"Each operation is broken down into its <strong>operation Expected Results (RE)</strong>, linked to the country strategy's <strong>Expected Results (ER)</strong>, grouped by Strategic Objective and Pillar. The lines show the degree of alignment.",
+  "intro_A":"<sup class=\"ast\">*</sup>Operations active since the approval of the Country Strategy (approved under the CS and inherited), per OVE criteria (loans, guarantees, grants). Hover over the circles (RE) to see the specific objective, and over the lines to see the rationale. <strong>Click to pin the highlight</strong> (useful to scroll without losing it); click again or on empty space to release. ",
+  "intro_B":"Technical Cooperations. Their alignment, when it exists, is of limited scope.",
+  "intro_noalin":"Operations whose classification found no link to any strategy Expected Result (all their rows with logical connection = NO).",
+  "intro_agregada":"Rating of each Expected Result based on its aligned operations: <strong>Strong</strong> if strongly-aligned operations are the majority or there is a tie (one strong and one weak counts as Strong); <strong>Weak</strong> if weakly-aligned operations predominate; <strong>No coverage</strong> if there are no aligned operations. The strategy objective is considered <strong>strong when at least one of its Expected Results is strong</strong> (reflected in the lines toward the objective). Technical Cooperations are not considered in this rating.",
+  "intro_resumenejec":"Executive summary of the portfolio–strategy alignment (generated in the flow).",
+  "legnote":"Probability of achievement per operation (portfolio review), scale 0–1: Low=0, Medium=0.5, High=1. Each operation's color comes from the aggregation rule over its Expected Results (RE); the color of the strategy's Expected Results and objectives is the simple average (0–1) of the aligned type-A operations with reviewed probability — thresholds: ≤0.25 low · 0.25–0.70 medium · ≥0.70 high. Technical Cooperations do not carry a probability color (light blue).",
+  "footer":"Source: exercise classifying the alignment of the portfolio with the country strategy's Expected Results. RE = operation Expected Result (specific objective). ER = strategy Expected Result.",
+  "leg1":"<span style=\"font-weight:700;color:var(--ink)\">Probability of achievement (operations):</span>",
+  "leg2":"<span class=\"dot\" style=\"background:var(--alta)\"></span> High",
+  "leg3":"<span class=\"dot\" style=\"background:var(--media)\"></span> Medium",
+  "leg4":"<span class=\"dot\" style=\"background:var(--baja)\"></span> Low",
+  "leg5":"<span class=\"dot\" style=\"background:var(--sinrev)\"></span> Not reviewed",
+  "leg6":"<span style=\"font-weight:700;color:var(--ink)\">Strategy ER / objective:</span> <span class=\"bar\"></span> average (continuous)",
+  "leg7":"<span class=\"dot\" style=\"background:var(--tc)\"></span> Technical Cooperation",
+  "leg8":"<span style=\"font-weight:700;color:var(--ink)\">Line:</span> <span class=\"sw\" style=\"border-top-color:#8a97ad\"></span> strong · <span class=\"sw\" style=\"border-top-color:#8a97ad;border-top-style:dashed\"></span> weak"
+};
+function translateUI(){
+  if(LANG!=='en') return;
+  try{
+    document.querySelectorAll('[data-i18n]').forEach(function(el){ var k=el.getAttribute('data-i18n'); if(EN_HTML[k]!=null) el.innerHTML=EN_HTML[k]; });
+    document.querySelectorAll('.tab, button.loadbtn, th, .badge, .stat .l, h2, #loadstatus').forEach(function(el){
+      var key=(el.textContent||'').trim(); if(_T[key]!=null) el.textContent=_T[key];
+    });
+    document.querySelectorAll('.colhead').forEach(function(el){
+      var tsp=el.querySelectorAll('tspan');
+      if(tsp.length){ tsp.forEach(function(t){ var k=(t.textContent||'').trim(); if(_T[k]!=null) t.textContent=_T[k]; }); }
+      else { var k=(el.textContent||'').trim(); if(_T[k]!=null) el.textContent=_T[k]; }
+    });
+    var h=document.getElementById('page-title');
+    if(h){ h.innerHTML=h.innerHTML.replace('Vinculación de la Estrategia de País con la Cartera','Country Strategy–Portfolio Alignment'); }
+    document.title=document.title.replace('Vinculación de la Estrategia de País con la Cartera','Country Strategy–Portfolio Alignment');
+  }catch(e){}
+}
+
+function renderAll(){
+  computeStats();
+  drawSankey("#chart-A", ROWS.filter(r=>r.op_type==="A"));
+  drawnB=false;
+  // si la pestaña B está activa, redibujar
+  if(document.getElementById("tab-B").classList.contains("active")){ drawSankey("#chart-B", ROWS.filter(r=>r.op_type==="B")); drawnB=true; }
+  buildTable();
+  buildResumen();
+  buildNoAlineadas();
+  buildDiag();
+  buildAgregada();
+  try{translateUI();}catch(e){}
+}
+drawSankey("#chart-A", ROWS.filter(r=>r.op_type==="A"));
+try{translateUI();}catch(e){}
+
+/* Toggle en vivo: muestra u oculta las alineaciones a nivel de Objetivo Estratégico. */
+function toggleObjLinks(){
+  SHOW_OBJ_LINKS = !SHOW_OBJ_LINKS;
+  var b=document.getElementById("toggleObj");
+  if(b) b.textContent = "🔗 Alineaciones a objetivo: " + (SHOW_OBJ_LINKS ? "ON" : "OFF");
+  renderAll();
+}
+
+// Tabla
+function buildTable(){
+  let rows="";
+  const sorted=ROWS.slice().sort((a,b)=>a.op.localeCompare(b.op)||a.oe_id.localeCompare(b.oe_id));
+  sorted.forEach(r=>{
+    const badge=r.align==="Strong"?'<span class="badge strong">Strong</span>':r.align==="Weak"?'<span class="badge weak">Weak</span>':'<span class="badge none">None</span>';
+    const meta=r.er&&r.er!=="None"&&erIndex[r.er]?erIndex[r.er].pilar:"—";
+    rows+=`<tr><td class="col-op">${r.op}</td><td class="col-num">${r.op_type}</td><td>${r.oe_id.replace("OE","RE")}</td><td>${r.oe||""}</td><td>${r.er||"None"}</td><td>${meta}</td><td class="col-num">${r.conn}</td><td class="col-num">${r.feas||"—"}</td><td>${badge}</td><td>${r.reasoning||""}</td></tr>`;
+  });
+  document.getElementById("align-table-wrap").innerHTML=`<table class="align-table"><thead><tr>
+    <th>Operación</th><th>Tipo</th><th>RE oper.</th><th>Descripción RE</th><th>ER estrategia</th><th>Pilar</th><th>Conex.</th><th>Factib.</th><th>Alineación</th><th>Justificación</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+buildTable();
+
+/* ====== TABLA RESUMEN por ER (fuerte/débil/total + códigos), A y B por separado ====== */
+function resumenData(){
+  const allER=[];
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>allER.push({er, pilar:p.pilar}))));
+  return allER.map(({er,pilar})=>{
+    const filas=ROWS.filter(r=>r.conn==="YES"&&r.er===er);
+    function agg(tipo){
+      const all=[...new Set(filas.filter(r=>r.op_type===tipo).map(r=>r.op))];
+      const strong=[...new Set(filas.filter(r=>r.op_type===tipo&&r.align==="Strong").map(r=>r.op))];
+      const weak=[...new Set(filas.filter(r=>r.op_type===tipo&&r.align==="Weak").map(r=>r.op))];
+      return {strong, weak, all};
+    }
+    return {er, pilar, A:agg("A"), B:agg("B")};
+  });
+}
+
+function buildResumen(){
+  const data=resumenData();
+  let rows=""; let currentPilar=null;
+  data.forEach(d=>{
+    if(d.pilar!==currentPilar){ currentPilar=d.pilar; rows+=`<tr class="pilar-row"><td colspan="7">${d.pilar}</td></tr>`; }
+    const aS=d.A.strong.length, aW=d.A.weak.length;
+    const bT=d.B.all.length;
+    const codesA=[...d.A.strong, ...d.A.weak].join(", ");
+    const codesB=d.B.all.join(", ");
+    rows+=`<tr>
+      <td class="er-cell">${d.er}</td>
+      <td class="col-num">${aS}</td><td class="col-num">${aW}</td><td class="col-num">${aS+aW}</td>
+      <td class="op-codes">${codesA||"—"}</td>
+      <td class="col-num">${bT}</td>
+      <td class="op-codes">${codesB||"—"}</td>
+    </tr>`;
+  });
+  document.getElementById("resumen-table-wrap").innerHTML=`
+    <table class="align-table resumen-table">
+      <thead>
+        <tr><th rowspan="2">Resultado Esperado (estrategia)</th>
+          <th colspan="4" style="text-align:center;">Operaciones</th>
+          <th colspan="2" style="text-align:center;">Cooperaciones Técnicas </th></tr>
+        <tr><th>Fuerte</th><th>Débil</th><th>Total</th><th>Operaciones </th>
+          <th>Total</th><th>Cooperaciones </th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+/* ====== DIAGNÓSTICO: related_er (conn=YES) que NO coinciden con la estrategia ======
+   Red de seguridad al cambiar de país o al correr de nuevo el agente. Lista las
+   cadenas que quedaron sin vincular para corregirlas en el agente o sumarlas a
+   ER_ALIASES. (Se evalúa después de canonicalER, así que solo marca lo que la
+   normalización no pudo resolver: reformulaciones reales, no diferencias de formato.) */
+function erDiagnostic(){
+  const stratSet=new Set();
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>stratSet.add(er))));
+  const misses={};
+  ROWS.forEach(r=>{
+    // Los ##OBJ## son alineaciones a nivel de Objetivo Estratégico (ya resueltas por canonicalER): NO son errores.
+    if(r.conn==="YES" && r.er && r.er!=="None" && !isObjRef(r.er) && !stratSet.has(r.er)){
+      (misses[r.er]=misses[r.er]||new Set()).add(r.op);
+    }
+  });
+  return Object.keys(misses).sort().map(er=>({er, ops:[...misses[er]].sort()}));
+}
+function buildDiag(){
+  const d=erDiagnostic();
+  if(d.length===0){
+    console.log("[diagnóstico ER] ✓ Todos los related_er con conexión coinciden con un ER de la estrategia.");
+    return;
+  }
+  console.warn("[diagnóstico ER] ⚠ "+d.length+" texto(s) de related_er sin coincidencia con la estrategia (quedaron SIN vincular). Corregir la redacción en el agente o agregar la variante a ER_ALIASES:");
+  d.forEach(x=>console.warn('  • "'+x.er+'"  ('+x.ops.length+' oper.: '+x.ops.join(", ")+')'));
+}
+
+/* ====== Operaciones SIN alineación (ninguna fila con conn=YES) ====== */
+function noAlineadasData(){
+  const allOps=[...new Set(ROWS.map(r=>r.op))];
+  const opType={}; ROWS.forEach(r=>{ opType[r.op]=r.op_type; });
+  const alineadas=new Set(ROWS.filter(r=>r.conn==="YES").map(r=>r.op));
+  const sin=allOps.filter(op=>!alineadas.has(op));
+  return { A:sin.filter(op=>opType[op]==="A").sort(), B:sin.filter(op=>opType[op]==="B").sort() };
+}
+function buildNoAlineadas(){
+  const {A,B}=noAlineadasData();
+  const fila=(tipo,codes)=>`<tr>
+      <td>${tipo}</td><td class="col-num">${codes.length}</td><td class="op-codes">${codes.join(", ")||"—"}</td>
+    </tr>`;
+  document.getElementById("noalin-table-wrap").innerHTML=`
+    <table class="align-table resumen-table">
+      <thead><tr><th>Tipo de operación</th><th>Cantidad</th><th>Operaciones (códigos)</th></tr></thead>
+      <tbody>
+        ${fila("Operaciones (préstamos, garantías, grants)",A)}
+        ${fila("Cooperaciones Técnicas",B)}
+        <tr class="pilar-row"><td>Total sin alineación</td><td class="col-num">${A.length+B.length}</td><td></td></tr>
+      </tbody>
+    </table>`;
+}
+
+function descargarResumenCSV(){
+  const data=resumenData();
+  let csv="Pilar,Resultado Esperado,A_Fuerte,A_Debil,A_Total,Operaciones_A,B_Total,Cooperaciones_B\n";
+  data.forEach(d=>{
+    const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+    csv+=[q(d.pilar),q(d.er),d.A.strong.length,d.A.weak.length,d.A.strong.length+d.A.weak.length,
+          q([...d.A.strong,...d.A.weak].join(", ")),
+          d.B.strong.length+d.B.weak.length,
+          q([...d.B.strong,...d.B.weak].join(", "))].join(",")+"\n";
+  });
+  bajarCSV(csv,"resumen_alineacion.csv","copystatus");
+}
+
+function bajarCSV(csv,nombre,statusId){
+  const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8;"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=nombre; a.click();
+  if(statusId) document.getElementById(statusId).textContent="✓ CSV descargado.";
+}
+
+// Copiar cualquier tabla al portapapeles (para Excel)
+function copiarTabla(selector, statusId){
+  const tabla=document.querySelector(selector);
+  if(!tabla) return;
+  const range=document.createRange(); range.selectNode(tabla);
+  const sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  try{ document.execCommand("copy"); if(statusId) document.getElementById(statusId).textContent="✓ Tabla copiada — pegala en Excel."; }
+  catch(e){ if(statusId) document.getElementById(statusId).textContent="Seleccioná la tabla y copiá manualmente."; }
+  sel.removeAllRanges();
+}
+function copiarResumen(){ copiarTabla("#resumen-table-wrap table","copystatus"); }
+
+/* ====== TAB ALINEACIÓN AGREGADA — rating por ER (solo operaciones A) ====== */
+function agregadaData(){
+  // Para cada RE: calificación por operaciones A alineadas (I.2).
+  // Fuerte si ops fuertes >= ops débiles (empate -> Fuerte); Débil si débiles > fuertes; Sin cobertura si 0.
+  const allER=[];
+  STRATEGY.forEach(p=>p.objetivos.forEach(o=>o.ers.forEach(er=>allER.push({er, pilar:p.pilar}))));
+  return allER.map(({er,pilar})=>{
+    const filas=ROWS.filter(r=>r.conn==="YES"&&r.er===er&&r.op_type==="A");
+    const opsER=[...new Set(filas.map(r=>r.op))];
+    const strong=opsER.filter(op=>filas.some(r=>r.op===op&&r.align==="Strong"));
+    const weak=opsER.filter(op=>!filas.some(r=>r.op===op&&r.align==="Strong"));
+    const total=opsER.length;
+    let rating="Sin cobertura";
+    if(total>0) rating = (strong.length>=weak.length) ? "Fuerte" : "Débil";
+    return {er, pilar, nStrong:strong.length, nWeak:weak.length, total, rating};
+  });
+}
+function buildAgregada(){
+  const data=agregadaData();
+  let rows=""; let currentPilar=null;
+  data.forEach(d=>{
+    if(d.pilar!==currentPilar){ currentPilar=d.pilar; rows+=`<tr class="pilar-row"><td colspan="5">${d.pilar}</td></tr>`; }
+    const badge = d.rating==="Fuerte" ? '<span class="badge strong">Fuerte</span>'
+               : d.rating==="Débil" ? '<span class="badge weak">Débil</span>'
+               : '<span class="badge none">Sin cobertura</span>';
+    rows+=`<tr>
+      <td class="er-cell">${d.er}</td>
+      <td class="col-num">${d.nStrong}</td>
+      <td class="col-num">${d.nWeak}</td>
+      <td class="col-num">${d.total}</td>
+      <td>${badge}</td>
+    </tr>`;
+  });
+  document.getElementById("agregada-table-wrap").innerHTML=`
+    <table class="align-table resumen-table">
+      <thead><tr>
+        <th>Resultado Esperado (estrategia)</th>
+        <th>Ops. fuertes</th><th>Ops. débiles</th><th>Total alineadas</th>
+        <th>Calificación del ER</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+function descargarAgregadaCSV(){
+  const data=agregadaData();
+  let csv="Pilar,Resultado Esperado,Ops_Fuertes,Ops_Debiles,Total_Alineadas,Calificacion_ER\n";
+  data.forEach(d=>{
+    const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+    csv+=[q(d.pilar),q(d.er),d.nStrong,d.nWeak,d.total,q(d.rating)].join(",")+"\n";
+  });
+  bajarCSV(csv,"alineacion_agregada.csv","copystatus2");
+}
+buildResumen();
+buildNoAlineadas();
+buildDiag();
+buildAgregada();
+
+function parseAgentCSV(text){
+  var rows=parseCSV(text);
+  // normalizar filas: detectar nivel (OE/OP), proyecto y campos
+  var norm=[];
+  for(var i=0;i<rows.length;i++){
+    var r=rows[i]; if(!r||r.length<8) continue;
+    var nivel="", f=r;
+    if(r[0]==="OE"||r[0]==="OP"){ nivel=r[0]; f=r.slice(1); }
+    if(f.length<9) continue;
+    var proj=(f[0]||"").trim(); var _pl=proj.toLowerCase(); if(!proj||_pl==="project"||_pl==="nivel") continue;
+    norm.push({nivel:nivel, proj:proj, f:f});
+  }
+  // proyectos que tienen filas OE (Type A). Para esos, ignoramos las OP.
+  var conOE={}; norm.forEach(function(x){ if(x.nivel!=="OP") conOE[x.proj]=true; });
+  var out=[];
+  norm.forEach(function(x){
+    // filas OP solo se usan si el proyecto NO tiene filas OE (caso TC: solo OP)
+    if(x.nivel==="OP" && conOE[x.proj]) return;
+    var f=x.f;
+    out.push({op:x.proj, op_type:(/-T/i.test(x.proj)?"B":"A"), oe_id:(f[1]||"OE1").trim()||"OE1",
+      oe:(f[2]||"").trim(), er:canonicalER((f[5]||"None").trim()||"None"),
+      conn:(f[4]||"NO").trim().toUpperCase(), feas:(f[6]||"").trim(),
+      align:(f[7]||"").trim(), reasoning:(f[8]||"").trim()});
+  });
+  return out;
+}
+function buildStrategyFromFlat(text){
+  var lines=text.replace(/\r/g,'').split('\n'); var order=[]; var map={};
+  for(var i=0;i<lines.length;i++){ var ln=lines[i]; if(!ln.trim()) continue;
+    var p=ln.split('|'); if(p.length<3) continue;
+    var area=p[0].trim(), obj=p[1].trim(), er=p.slice(2).join('|').trim();
+    if(!area || area.toLowerCase()==='areaprioritaria') continue;
+    if(!map[area]){ map[area]={order:[],objs:{}}; order.push(area); }
+    if(!map[area].objs[obj]){ map[area].objs[obj]=[]; map[area].order.push(obj); }
+    if(er) map[area].objs[obj].push(er);
+  }
+  return order.map(function(a){ return {pilar:a, objetivos:map[a].order.map(function(o){ return {obj:o, ers:map[a].objs[o]}; })}; });
+}
+function initResumen(){
+  try{ var el=document.getElementById('resumen-src'), cont=document.getElementById('resumen-ejec-cont'),
+    btn=document.querySelector('[data-tab="resumenejec"]');
+    var t=el?el.textContent.trim():"";
+    if(t && !(t.charAt(0)==='@'&&t.charAt(1)==='@')){ if(cont) cont.textContent=t; }
+    else { if(cont) cont.textContent='El resumen ejecutivo se genera en el flujo. En esta vista no hay uno cargado.'; }
+  }catch(e){ console.log('resumen',e); }
+}
+function switchTab(name){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===name));
+  document.querySelectorAll(".tab-content").forEach(c=>c.classList.remove("active"));
+  document.getElementById("tab-"+name).classList.add("active");
+  applyLegend();
+  if(name==="B"&&!drawnB){ drawSankey("#chart-B", ROWS.filter(r=>r.op_type==="B")); drawnB=true; } try{translateUI();}catch(e){}
+}
+
+/* ============================================================
+   CARGA DE CSV — el usuario sube el output del agente y se redibuja.
+   Columnas esperadas: project,oe_id,oe_text,er_slot,logical_connection,
+                       related_er,feasibility,alignment,reasoning
+   ============================================================ */
+function parseCSV(text){
+  // Parser que respeta comillas dobles y saltos internos
+  const rows=[]; let i=0, field='', row=[], inQ=false;
+  text=text.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  while(i<text.length){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){ if(text[i+1]==='"'){ field+='"'; i+=2; continue; } inQ=false; i++; continue; }
+      field+=c; i++; continue;
+    } else {
+      if(c==='"'){ inQ=true; i++; continue; }
+      if(c===','){ row.push(field); field=''; i++; continue; }
+      if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; i++; continue; }
+      field+=c; i++; continue;
+    }
+  }
+  if(field.length||row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r=>r.length>1 || (r.length===1 && r[0].trim()!==''));
+}
+
+function inferType(op){ return /-T/i.test(op)?"B":"A"; }
+
+function csvToRows(text){
+  const parsed=parseCSV(text);
+  if(parsed.length<2) return [];
+  const header=parsed[0].map(h=>h.trim().toLowerCase());
+  const idx=name=>header.indexOf(name);
+  const iProj=idx("project"), iOe=idx("oe_id"), iOeT=idx("oe_text"),
+        iConn=idx("logical_connection"), iEr=idx("related_er"),
+        iFeas=idx("feasibility"), iAlign=idx("alignment"), iReason=idx("reasoning");
+  const out=[];
+  for(let k=1;k<parsed.length;k++){
+    const r=parsed[k]; if(!r[iProj]||r[iProj].trim()==='') continue;
+    const op=r[iProj].trim();
+    const conn=(r[iConn]||"").trim().toUpperCase();
+    let align=(iAlign>=0?r[iAlign]:"").trim();
+    // normalizar capitalización
+    const capital=s=>s?s.charAt(0).toUpperCase()+s.slice(1).toLowerCase():s;
+    align=capital(align);
+    let feas=capital((iFeas>=0?r[iFeas]:"").trim());
+    // TC sin alignment pero con conexión -> Weak
+    if(conn==="YES" && (!align||align==="")) align="Weak";
+    if(conn==="NO") align="None";
+    out.push({
+      op, op_type:inferType(op),
+      oe_id:(r[iOe]||"OE1").trim(),
+      oe:(iOeT>=0?r[iOeT]:"").trim(),
+      er:canonicalER(iEr>=0?r[iEr]:"None"),
+      conn:conn||"NO",
+      feas, align,
+      reasoning:(iReason>=0?r[iReason]:"").trim()
+    });
+  }
+  return out;
+}
+
+/* (Carga por CSV desactivada: los datos se embeben directamente en ROWS.) */
+
+/* Si no hay colores cargados, ocultar la leyenda de probabilidad. */
+applyLegend();
+
+/* ===== Carga de archivos (agente o colores) — a prueba de botón ===== */
+function _setStatus(msg, ok){
+  var el=document.getElementById("loadstatus"); if(!el) return;
+  el.textContent=msg;
+  el.style.color = ok===true ? "#1f7a44" : (ok===false ? "#b23b3b" : "");
+  el.style.fontWeight="600";
+}
+function loadCSVText(text, fname){
+  var h; try{ var p=parseCSV(text); h=p.length?p[0].map(function(x){return x.trim().toLowerCase();}):[]; }catch(e){ h=[]; }
+  var hasColor = h.indexOf("color")>=0;
+  var hasAgent = h.indexOf("related_er")>=0 || h.indexOf("oe_text")>=0 || h.indexOf("alignment")>=0;
+  try{
+    if(hasColor && !hasAgent){
+      COLOR_OE=csvToColors(text); rebuildColors(); applyLegend(); renderAll();
+      var n=Object.keys(COLOR_OE).length;
+      _setStatus("\u2713 Colores cargados desde "+fname+": "+n+" operaciones.", n>0);
+    } else if(hasAgent){
+      var rows=csvToRows(text);
+      if(!rows.length){ _setStatus("El CSV del agente no tiene filas válidas.", false); return; }
+      ROWS=rows; renderAll();
+      _setStatus("\u2713 Datos del agente cargados desde "+fname+": "+ROWS.length+" filas.", true);
+    } else {
+      _setStatus("No reconozco las columnas de "+fname+". Necesita 'color' (colores) o 'related_er' (agente).", false);
+    }
+  }catch(err){ _setStatus("Error al leer "+fname+": "+err.message, false); }
+}
+(function(){
+  ["csvfile","colorfile"].forEach(function(id){
+    var inp=document.getElementById(id); if(!inp) return;
+    inp.addEventListener("change",function(ev){
+      var file=ev.target.files && ev.target.files[0]; if(!file) return;
+      var reader=new FileReader();
+      reader.onload=function(e){ loadCSVText(e.target.result, file.name); };
+      reader.onerror=function(){ _setStatus("No se pudo leer el archivo.", false); };
+      reader.readAsText(file,"UTF-8");
+      ev.target.value="";   /* permite recargar el mismo archivo */
+    });
+  });
+})();
+
+initResumen();
+(function(){ var h=document.getElementById('page-title'); if(h && h.textContent.indexOf('@@')>=0){ var t=h.textContent.replace(/\s*[—-]\s*@@[^@]*@@\s*$/,''); h.textContent=t; document.title=t; } })();
+</script>
+
+</body>
+</html>
